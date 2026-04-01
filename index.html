@@ -3,33 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JOKASO-DESTROY-V5</title>
+    <title>DESTROY-V6-FINAL</title>
     <style>
-        :root { --bg: #050505; --card: #111; --accent: #00e5ff; --danger: #ff0055; --success: #00ff66; }
+        :root { --bg: #000; --card: #111; --accent: #00e5ff; --danger: #ff0055; --success: #00ff66; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
         #start-overlay { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #start-btn { width: 180px; height: 180px; border-radius: 50%; border: 8px solid var(--danger); background: #000; color: #fff; font-size: 1.4em; font-weight: bold; }
+        #start-btn { width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--danger); background: #000; color: #fff; font-size: 1.2em; font-weight: bold; cursor: pointer; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .card { background: var(--card); padding: 12px; border-left: 5px solid var(--accent); border-radius: 4px; }
+        .card { background: var(--card); padding: 10px; border-left: 4px solid var(--accent); border-radius: 4px; border-bottom: 1px solid #333; }
         .card.full { grid-column: span 2; }
         .label { font-size: 0.7em; color: var(--accent); }
-        .value { font-size: 1.8em; font-weight: bold; }
+        .value { font-size: 1.6em; font-weight: bold; color: #fff; }
         .btn-group { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .main-btn { padding: 20px; border: none; border-radius: 8px; font-size: 1.2em; font-weight: bold; color: #000; cursor: pointer; }
-        #save-btn { background: var(--success); }
-        #list-btn { background: var(--accent); }
-        #log { background: #000; height: 50px; overflow-y: auto; font-size: 0.7em; padding: 5px; color: var(--danger); border-top: 1px solid #333; margin-top: 10px; }
+        .main-btn { padding: 18px; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; }
+        #save-btn { background: var(--success); color: #000; }
+        #list-btn { background: var(--accent); color: #000; }
+        #log { background: #000; height: 40px; overflow-y: auto; font-size: 0.7em; padding: 5px; color: var(--danger); border-top: 1px solid #333; margin-top: 10px; }
+        .note-row { font-size: 0.85em; color: #bbb; border-bottom: 1px solid #222; padding: 2px 0; }
         .listening { color: var(--danger); animation: blink 0.8s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
     </style>
 </head>
 <body>
 
-<div id="start-overlay"><button id="start-btn">DESTROY<br>V5 START</button></div>
+<div id="start-overlay"><button id="start-btn">DESTROY<br>V6 START</button></div>
 
-<div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 5px;">
+<div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 5px; background: #111;">
     <div><span id="mic-status">●</span> <span id="status-text">待機</span></div>
-    <div id="user-name">未ログイン</div>
+    <div id="user-name" style="color: var(--accent);">未ログイン</div>
 </div>
 
 <div class="grid">
@@ -38,31 +39,31 @@
     <div class="card"><div class="label">透視度</div><div class="value" id="res-toshido">--</div></div>
     <div class="card"><div class="label">残留塩素</div><div class="value" id="res-cl">--</div></div>
     <div class="card"><div class="label">水温</div><div class="value" id="res-temp">--</div></div>
-    <div class="card full"><div class="label">指摘(1-7) / メモ</div><div id="note-display" style="font-size: 0.9em; min-height: 40px;">--</div></div>
+    <div class="card full"><div class="label">指摘事項 (1-7)</div><div id="note-display" style="min-height: 50px;"></div></div>
 </div>
 
 <div id="log"></div>
 
 <div class="btn-group">
-    <button id="save-btn" class="main-btn">保存して次へ</button>
-    <button id="list-btn" class="main-btn">本日の履歴</button>
+    <button id="save-btn" class="main-btn">💾 保存して次へ (SAVE)</button>
+    <button id="list-btn" class="main-btn">📋 本日の履歴を表示</button>
 </div>
 
-<div id="history-area" style="display:none; background:#111; padding:10px; font-size:0.8em; border:1px solid var(--accent); margin-top:10px;"></div>
+<div id="history-area" style="display:none; background:#111; padding:10px; font-size:0.8em; border:1px solid var(--accent); margin-top:10px; max-height: 150px; overflow-y: auto;"></div>
 
 <script>
     /** ★ここにGASのウェブアプリURLを貼り付け★ */
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzF9N8WTcDQCMf0Sy43yeHPc3avSyh6i66-tiWSxI1xEkHF0hfw3xXTxfK7YdSFxY72zw/exec";
 
-    // 9名の検査員リスト（誤変換・活舌対策）
+    // 9名の検査員リスト（漢字変換ミス・活舌対策）
     const inspectors = [
         {key: "守矢", aliases: ["守矢", "守谷", "もりや"]},
-        {key: "金井", aliases: ["金井", "家内", "かない"]},
+        {key: "金井", aliases: ["金井", "かない"]},
         {key: "長嶋祐樹", aliases: ["長嶋祐樹", "長島祐樹", "永島祐樹", "ながしまゆうき", "ゆうき"]},
-        {key: "永嶋秀記", aliases: ["永嶋秀記", "永島秀記", "永島英記", "ながしまひでき", "ひでき"]},
-        {key: "高田", aliases: ["高田", "たかだ", "たかた"]},
+        {key: "永嶋秀記", aliases: ["永嶋秀記", "永島秀記", "ながしまひでき", "ひでき"]},
+        {key: "高田", aliases: ["高田", "たかだ"]},
         {key: "吉田", aliases: ["吉田", "よしだ"]},
-        {key: "江刺", aliases: ["江刺", "江差", "餌差し", "えさし"]},
+        {key: "江刺", aliases: ["江刺", "えさし"]},
         {key: "高嶋", aliases: ["高嶋", "高島", "たかしま"]},
         {key: "渋谷", aliases: ["渋谷", "しぶや"]}
     ];
@@ -84,7 +85,7 @@
 
     document.getElementById('start-btn').onclick = () => {
         document.getElementById('start-overlay').style.display = 'none';
-        speak("起動。名前をどうぞ。");
+        speak("音声入力起動。お名前をどうぞ。");
         recognition.start();
         updateStatus(true);
     };
@@ -100,18 +101,18 @@
     recognition.onend = () => { if (!isLocked) recognition.start(); };
 
     function analyze(cmd) {
-        // 終了コマンド
-        if (match(cmd, ["終了", "ストップ", "終わり", "おわり"])) {
+        // 音声終了
+        if (match(cmd, ["終了", "終わり", "ストップ"])) {
             isLocked = true; recognition.stop(); updateStatus(false);
-            speak("音声入力を終了しました。"); return;
+            speak("音声入力を終了。検査表に入力してください。"); return;
         }
 
-        // 検査員判定
+        // ログイン
         if (!state.inspector) {
             const user = inspectors.find(i => i.aliases.some(a => cmd.includes(a)));
             if (user) {
                 state.inspector = user.key;
-                document.getElementById('user-name').innerText = user.key;
+                document.getElementById('user-name').innerText = "担当: " + user.key;
                 speak(user.key + "さん。どうぞ。");
             }
             return;
@@ -119,23 +120,25 @@
 
         const num = cmd.match(/\d+(\.\d+)?/)?.[0];
         
-        // 項目判定（あだ名リスト）
+        // 項目判定（あだ名リスト大幅強化）
         if (match(cmd, ["ペーハー", "ベーハー", "ph", "ピーエイチ"])) {
             state.ph = num; updateUI("res-ph", num); speak("PH" + num);
-        } else if (match(cmd, ["デーオー", "デオ", "ディーオー", "do"])) {
+        } else if (match(cmd, ["デーオー", "デオ", "ディーオー", "do", "どお", "どう"])) {
             state.do = num; updateUI("res-do", num); speak("DO" + num);
-        } else if (match(cmd, ["透視", "トウシ", "トウメイド", "透明", "投資", "ドウド", "とうめい", "みず"])) {
+        } else if (match(cmd, ["透視", "トウシ", "トウメイド", "トウド", "ドウド", "とうめい", "みず", "とうしど"])) {
             state.toshido = num; updateUI("res-toshido", num); speak("透視" + num);
-        } else if (match(cmd, ["残留塩素", "残留", "ざんりゅう", "えんそ"])) {
+        } else if (match(cmd, ["残留塩素", "ざんりゅう", "えんそ"])) {
             let clVal = cmd.includes("不検出") ? "不検出" : (cmd.includes("検出") ? "検出" : num);
             state.cl = clVal; updateUI("res-cl", clVal); speak("塩素" + clVal);
-        } else if (match(cmd, ["水温", "すいおん", "おんど"])) {
+        } else if (match(cmd, ["水温", "すいおん"])) {
             state.temp = num; updateUI("res-temp", num); speak("水温" + num);
-        } else if (match(cmd, ["指摘", "してき", "異常", "いじょう", "メモ", "めも", "備考", "びこう"])) {
+        } else if (match(cmd, ["指摘", "いじょう", "メモ", "備考"])) {
             const idxMatch = cmd.match(/([1-7])/);
             const idx = idxMatch ? idxMatch[1] : "1";
-            const note = cmd.split(/指摘[1-7]?|異常|メモ|備考/)[1] || "異常あり";
-            state["note" + idx] = note; renderNotes(); speak("メモ" + idx + "了解");
+            const note = cmd.split(/指摘[1-7]?|いじょう|メモ|備考/)[1] || "異常あり";
+            state["note" + idx] = note; 
+            renderNotes(); 
+            speak("指摘" + idx + "了解");
         }
     }
 
@@ -147,25 +150,34 @@
 
     function renderNotes() {
         let html = "";
-        for(let i=1; i<=7; i++) if(state["note"+i]) html += `<div>[${i}] ${state["note"+i]}</div>`;
+        for(let i=1; i<=7; i++) {
+            if(state["note"+i]) html += `<div class="note-row">[${i}] ${state["note"+i]}</div>`;
+        }
         document.getElementById('note-display').innerHTML = html || "--";
     }
 
     document.getElementById('save-btn').onclick = () => {
-        if (!state.inspector) { alert("ログインしてください"); return; }
+        if (!state.inspector) { alert("ログインが必要です"); return; }
         speak("保存中");
         fetch(GAS_URL, { method: "POST", body: JSON.stringify(state) })
-        .then(() => { speak("完了"); setTimeout(()=>location.reload(), 800); })
-        .catch(() => speak("失敗"));
+        .then(() => { 
+            speak("保存完了"); 
+            setTimeout(() => location.reload(), 1000); 
+        }).catch(() => speak("失敗"));
     };
 
     document.getElementById('list-btn').onclick = () => {
+        if (!state.inspector) { alert("検査員を特定してください"); return; }
         const area = document.getElementById('history-area');
         area.style.display = "block"; area.innerText = "読込中...";
         fetch(GAS_URL + "?name=" + encodeURIComponent(state.inspector))
         .then(res => res.json())
         .then(data => {
-            area.innerHTML = "<b>本日の履歴:</b><br>" + data.map(r => `・${new Date(r[0]).toLocaleTimeString()} pH${r[2]}`).join("<br>");
+            if (data.length === 0) { area.innerText = "本日のデータはありません"; return; }
+            area.innerHTML = "<b>今日の履歴:</b><br>" + data.map(r => {
+                const time = new Date(r[0]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return `・${time} : pH${r[2]} / DO${r[3]} / 透${r[4]}`;
+            }).join("<br>");
         });
     };
 
