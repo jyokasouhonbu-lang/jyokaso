@@ -3,31 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JOKASO-DESTROY-V2</title>
+    <title>JOKASO-DESTROY-V3</title>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --danger: #ef4444; --success: #22c55e; }
+        :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --danger: #ef4444; --success: #22c55e; --warning: #f59e0b; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 15px; }
         #start-overlay { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #start-btn { width: 200px; height: 200px; border-radius: 50%; border: 8px solid var(--danger); background: #000; color: #fff; font-size: 1.8em; font-weight: bold; cursor: pointer; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        .card { background: var(--card); padding: 15px; border-radius: 12px; border-bottom: 4px solid var(--accent); }
+        #start-btn { width: 180px; height: 180px; border-radius: 50%; border: 6px solid var(--danger); background: #000; color: #fff; font-size: 1.5em; font-weight: bold; }
+        
+        .header { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 0.9em; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .card { background: var(--card); padding: 12px; border-radius: 10px; border-left: 4px solid var(--accent); }
         .card.full { grid-column: span 2; }
-        .label { font-size: 0.8em; color: #94a3b8; }
-        .value { font-size: 1.6em; font-weight: bold; color: var(--success); }
-        #log { background: #000; height: 100px; overflow-y: auto; font-size: 0.7em; padding: 10px; border: 1px solid #334155; margin-top: 10px; color: #4ade80; }
-        .listening { color: var(--danger); font-weight: bold; animation: blink 1s infinite; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+        .label { font-size: 0.75em; color: #94a3b8; }
+        .value { font-size: 1.5em; font-weight: bold; color: var(--success); }
+
+        .btn-group { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .main-btn { padding: 20px; border: none; border-radius: 12px; font-size: 1.2em; font-weight: bold; color: white; cursor: pointer; }
+        #save-btn { background: var(--success); box-shadow: 0 4px 15px rgba(34,197,94,0.4); }
+        #list-btn { background: var(--accent); }
+        
+        #history-area { margin-top: 20px; background: #000; padding: 10px; border-radius: 8px; display: none; font-size: 0.8em; max-height: 200px; overflow-y: auto; }
+        #log { background: #000; height: 60px; overflow-y: auto; font-size: 0.7em; padding: 5px; border: 1px solid #334155; margin-top: 10px; color: #4ade80; }
+        .listening { color: var(--danger); animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
 </head>
 <body>
 
-<div id="start-overlay">
-    <button id="start-btn">DESTROY START</button>
-    <p style="color: #64748b; margin-top: 20px;">開始後に「許可」を押してください</p>
-</div>
+<div id="start-overlay"><button id="start-btn">DESTROY<br>START</button></div>
 
-<div style="display: flex; justify-content: space-between; align-items: center;">
-    <div><span id="mic-icon" class="">●</span> <span id="status">音声待機中</span></div>
+<div class="header">
+    <div><span id="mic-status" class="">●</span> <span id="status-text">待機中</span></div>
     <div id="user-name">未ログイン</div>
 </div>
 
@@ -37,23 +43,34 @@
     <div class="card"><div class="label">透視度</div><div class="value" id="res-toshido">--</div></div>
     <div class="card"><div class="label">塩素</div><div class="value" id="res-cl">--</div></div>
     <div class="card"><div class="label">水温</div><div class="value" id="res-temp">--</div></div>
-    <div class="card full"><div class="label">指摘事項 </div><div class="value" id="res-note" style="font-size: 1em;">--</div></div>
+    <div class="card full"><div class="label">指摘</div><div class="value" id="res-note" style="font-size: 0.9em;">--</div></div>
 </div>
 
 <div id="log"></div>
 
+<div class="btn-group">
+    <button id="save-btn" class="main-btn">💾 スプレッドシートに保存</button>
+    <button id="list-btn" class="main-btn">📋 本日の履歴を確認</button>
+</div>
+
+<div id="history-area"></div>
+
 <script>
-    /** ★ここにGASのウェブアプリURLを貼り付け★ */
+    /** ★ここにGASのURLを貼り付け★ */
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzF9N8WTcDQCMf0Sy43yeHPc3avSyh6i66-tiWSxI1xEkHF0hfw3xXTxfK7YdSFxY72zw/exec";
 
-    const inspectors = ["守矢", "高田", "金井", "長嶋祐樹", "江刺", "吉田", "永嶋秀記", "渋谷", "高嶋"];
-    let state = { inspector: "", ph: "", do: "", toshido: "", cl: "", temp: "", note1: "", note2: "", note3: "", note4: "", note5: "", note6: "", note7: "" };
+    // 検査員リスト（漢字とひらがな両方で判定できるように強化）
+    const inspectors = [
+        {k: "守矢", r: "もりや"}, {k: "金井", r: "かない"}, {k: "長嶋祐樹", r: "ながしまゆうき"}, 
+        {k: "高田", r: "たかだ"}, {k: "高嶋", r: "たかしま"}, {k: "吉田", r: "よしだ"}
+        /* ...必要に応じて追加してください */
+    ];
+    
+    let state = { inspector: "", ph: "", do: "", toshido: "", cl: "", temp: "", note1:"", note2:"", note3:"", note4:"", note5:"", note6:"", note7:"" };
+    let isLocked = false; // 音声終了フラグ
 
-    // --- 音声合成（口）の設定 ---
     const synth = window.speechSynthesis;
     function speak(text) {
-        if (!text) return;
-        // 以前の読み上げをキャンセル
         synth.cancel();
         const uttr = new SpeechSynthesisUtterance(text);
         uttr.lang = 'ja-JP';
@@ -61,118 +78,107 @@
         synth.speak(uttr);
     }
 
-    // --- 音声認識（耳）の設定 ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = 'ja-JP';
     recognition.continuous = true;
-    recognition.interimResults = false;
 
-    // 開始ボタン
     document.getElementById('start-btn').onclick = () => {
         document.getElementById('start-overlay').style.display = 'none';
-        // ブラウザの音声制限を解除するための「空読み上げ」
-        speak("システムを起動しました。");
+        speak("起動しました。お名前をどうぞ。");
         recognition.start();
-        document.getElementById('mic-icon').className = "listening";
-        document.getElementById('status').innerText = "聴取中...";
+        updateStatus(true);
     };
 
     recognition.onresult = (event) => {
+        if (isLocked) return;
         const transcript = event.results[event.results.length - 1][0].transcript;
-        const cleanCmd = kanjiToNum(transcript.toLowerCase().replace(/\s+/g, ""));
-        addLog(cleanCmd);
-        analyze(cleanCmd);
+        const cmd = kanjiToNum(transcript.toLowerCase().replace(/\s+/g, ""));
+        addLog(cmd);
+        analyze(cmd);
     };
 
-    recognition.onend = () => recognition.start(); // 止まっても再起動
+    recognition.onend = () => { if (!isLocked) recognition.start(); };
 
-    // --- 解析ロジック（活舌対策） ---
     function analyze(cmd) {
-        // 1. ログイン（名前に「です」や「さん」が付いてもOK）
+        // 音声入力終了コマンド
+        if (cmd.includes("音声入力終了") || cmd.includes("音声終了") || cmd.includes("終了") || cmd.includes("完了")|| cmd.includes("終わり")) {
+            isLocked = true;
+            recognition.stop();
+            updateStatus(false);
+            speak("音声入力を終了しました。車に戻ったら保存ボタンを押してください。");
+            return;
+        }
+
+        // 検査員判定
         if (!state.inspector) {
-            const user = inspectors.find(n => cmd.includes(n));
+            const user = inspectors.find(i => cmd.includes(i.k) || cmd.includes(i.r));
             if (user) {
-                state.inspector = user;
-                document.getElementById('user-name').innerText = user + " 検査員";
-                speak(user + "さん、こんにちは。準備完了です。");
+                state.inspector = user.k;
+                document.getElementById('user-name').innerText = user.k;
+                speak(user.k + "さん、了解。数値をどうぞ。");
             }
             return;
         }
 
-        // 2. 送信・完了
-        if (cmd.includes("送信") || cmd.includes("完了") || cmd.includes("終わり") || cmd.includes("おわり")) {
-            speak("スプレッドシートに保存します。");
-            sendData();
-            return;
-        }
-
-        // 3. 項目マッチング（あだ名リスト）
         const num = cmd.match(/\d+(\.\d+)?/)?.[0];
         
-        if (match(cmd, ["ピーエイチ", "ピエチ", "ヒエチ", "ph", "ベーハー"])) {
-            state.ph = num;
-            updateUI("res-ph", num);
-            speak("ピーエイチ " + num);
-        } else if (match(cmd, ["ディーオー", "デオ", "ディオ", "do"])) {
-            state.do = num;
-            updateUI("res-do", num);
-            speak("ディーオー " + num);
-        } else if (match(cmd, ["透視度", "とうし", "透明"])) {
-            state.toshido = num;
-            updateUI("res-toshido", num);
-            speak("透視度 " + num);
-        } else if (match(cmd, ["塩素", "残留", "えんそ"])) {
+        if (match(cmd, ["ペーハー", "ベーハー", "ph", "ピーエイチ"])) {
+            state.ph = num; updateUI("res-ph", num); speak("ペーハー " + num);
+        } else if (match(cmd, ["デーオー", "デオ", "ディーオー", "do"])) {
+            state.do = num; updateUI("res-do", num); speak("デーオー " + num);
+        } else if (match(cmd, ["透視", "とうし", "投資", "当事", "ドウド"])) {
+            state.toshido = num; updateUI("res-toshido", num); speak("透視度 " + num);
+        } else if (match(cmd, ["塩素", "えんそ"])) {
             let clVal = cmd.includes("不検出") ? "不検出" : (cmd.includes("検出") ? "検出" : num);
-            state.cl = clVal;
-            updateUI("res-cl", clVal);
-            speak("塩素 " + clVal);
-        } else if (match(cmd, ["水温", "すいおん", "温度"])) {
-            state.temp = num;
-            updateUI("res-temp", num);
-            speak("水温 " + num);
+            state.cl = clVal; updateUI("res-cl", clVal); speak("塩素 " + clVal);
+        } else if (match(cmd, ["水温", "すいおん"])) {
+            state.temp = num; updateUI("res-temp", num); speak("水温 " + num);
         } else if (match(cmd, ["指摘", "してき", "異常"])) {
             const idx = cmd.match(/[1-7]/)?.[0] || "1";
             const note = cmd.split(/指摘[1-7]?|異常/)[1] || cmd;
-            state["note" + idx] = note;
-            updateUI("res-note", note);
-            speak("指摘" + idx + " 了解");
+            state["note" + idx] = note; updateUI("res-note", note); speak("指摘" + idx + " 了解");
         }
     }
 
-    // 複数の言葉のどれかに当たればOKとする関数
-    function match(cmd, list) {
-        return list.some(word => cmd.includes(word));
-    }
-
-    // 漢数字を数字に直す（活舌が悪いと漢字で認識されやすいため）
+    function match(cmd, list) { return list.some(word => cmd.includes(word)); }
     function kanjiToNum(str) {
         const kanji = {"ゼロ":0,"一":1,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"点":"."};
         return str.replace(/[一二三四五六七八九ゼロ点]/g, s => kanji[s]);
     }
 
-    function updateUI(id, val) {
-        document.getElementById(id).innerText = val || "--";
-    }
+    // 保存ボタンの処理
+    document.getElementById('save-btn').onclick = () => {
+        if (!state.inspector) { alert("検査員が特定されていません"); return; }
+        speak("送信中");
+        fetch(GAS_URL, { method: "POST", body: JSON.stringify(state) })
+        .then(() => {
+            speak("保存完了。リセットします。");
+            location.reload(); // 次の現場のためにリロード
+        }).catch(() => speak("通信失敗"));
+    };
 
+    // 履歴ボタンの処理
+    document.getElementById('list-btn').onclick = () => {
+        if (!state.inspector) { alert("検査員名が必要です"); return; }
+        const area = document.getElementById('history-area');
+        area.style.display = "block";
+        area.innerText = "読込中...";
+        fetch(GAS_URL + "?name=" + encodeURIComponent(state.inspector))
+        .then(res => res.json())
+        .then(data => {
+            area.innerHTML = "<b>本日の履歴:</b><br>" + data.map(r => `・${new Date(r[0]).toLocaleTimeString()} : pH${r[2]} DO${r[3]}`).join("<br>");
+        });
+    };
+
+    function updateUI(id, val) { document.getElementById(id).innerText = val || "--"; }
+    function updateStatus(listening) {
+        document.getElementById('mic-status').className = listening ? "listening" : "";
+        document.getElementById('status-text').innerText = listening ? "聴取中..." : "停止中";
+    }
     function addLog(m) {
         const l = document.getElementById('log');
         l.innerHTML = "<div>" + m + "</div>" + l.innerHTML;
-    }
-
-    function sendData() {
-        fetch(GAS_URL, {
-            method: "POST",
-            body: JSON.stringify(state)
-        }).then(() => {
-            speak("保存しました。次の現場へリセットします。");
-            reset();
-        }).catch(() => speak("通信エラーです。"));
-    }
-
-    function reset() {
-        Object.keys(state).forEach(k => { if(k!=="inspector") state[k]=""; });
-        ["res-ph","res-do","res-toshido","res-cl","res-temp","res-note"].forEach(id => document.getElementById(id).innerText="--");
     }
 </script>
 </body>
