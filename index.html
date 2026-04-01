@@ -3,181 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JOKASO-DESTROY-VOICE</title>
+    <title>JOKASO-DESTROY-V2</title>
     <style>
-        :root { --bg: #1a1a1a; --card: #2d3436; --accent: #00d2ff; --danger: #ff7675; --success: #55efc4; }
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; overflow-x: hidden; }
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #start-btn { width: 250px; height: 250px; border-radius: 50%; border: none; background: var(--danger); color: white; font-size: 2em; font-weight: bold; cursor: pointer; box-shadow: 0 0 30px rgba(255,118,117,0.5); }
-        
-        .header { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--card); border-radius: 10px; margin-bottom: 10px; }
-        .status-dot { width: 15px; height: 15px; border-radius: 50%; background: var(--success); display: inline-block; margin-right: 5px; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-
-        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .card { background: var(--card); padding: 15px; border-radius: 12px; border-left: 5px solid var(--accent); }
+        :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --danger: #ef4444; --success: #22c55e; }
+        body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 15px; }
+        #start-overlay { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #start-btn { width: 200px; height: 200px; border-radius: 50%; border: 8px solid var(--danger); background: #000; color: #fff; font-size: 1.8em; font-weight: bold; cursor: pointer; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .card { background: var(--card); padding: 15px; border-radius: 12px; border-bottom: 4px solid var(--accent); }
         .card.full { grid-column: span 2; }
-        .label { font-size: 0.9em; color: #aaa; margin-bottom: 5px; }
-        .value { font-size: 1.8em; font-weight: bold; color: var(--accent); min-height: 1.2em; }
-        
-        #log-area { background: #000; height: 80px; margin-top: 10px; padding: 10px; font-family: monospace; font-size: 0.8em; overflow-y: auto; border: 1px solid #444; color: #0f0; }
+        .label { font-size: 0.8em; color: #94a3b8; }
+        .value { font-size: 1.6em; font-weight: bold; color: var(--success); }
+        #log { background: #000; height: 100px; overflow-y: auto; font-size: 0.7em; padding: 10px; border: 1px solid #334155; margin-top: 10px; color: #4ade80; }
+        .listening { color: var(--danger); font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
 <div id="start-overlay">
-    <button id="start-btn">検査開始<br>(DESTROY!!)</button>
-    <p style="margin-top:20px; color:#aaa;">一度ボタンを押し、スマホはポケットに入れて下さい。</p>
+    <button id="start-btn">DESTROY START</button>
+    <p style="color: #64748b; margin-top: 20px;">開始後に「許可」を押してください</p>
 </div>
 
-<div class="header">
-    <div><span class="status-dot"></span> <span id="sys-msg">システム待機中</span></div>
-    <div id="user-display" style="font-weight:bold;">検査員: 未登録</div>
+<div style="display: flex; justify-content: space-between; align-items: center;">
+    <div><span id="mic-icon" class="">●</span> <span id="status">音声待機中</span></div>
+    <div id="user-name">未ログイン</div>
 </div>
 
 <div class="grid">
-    <div class="card"><div class="label">pH</div><div class="value" id="v-ph">--</div></div>
-    <div class="card"><div class="label">DO (mg/L)</div><div class="value" id="v-do">--</div></div>
-    <div class="card"><div class="label">透視度 (cm)</div><div class="value" id="v-toshido">--</div></div>
-    <div class="card"><div class="label">残留塩素</div><div class="value" id="v-cl">--</div></div>
-    <div class="card"><div class="label">水温 (℃)</div><div class="value" id="v-temp">--</div></div>
-    <div class="card full"><div class="label">指摘事項</div><div class="value" id="v-note" style="font-size:1.2em;">--</div></div>
+    <div class="card"><div class="label">pH</div><div class="value" id="res-ph">--</div></div>
+    <div class="card"><div class="label">DO</div><div class="value" id="res-do">--</div></div>
+    <div class="card"><div class="label">透視度</div><div class="value" id="res-toshido">--</div></div>
+    <div class="card"><div class="label">塩素</div><div class="value" id="res-cl">--</div></div>
+    <div class="card"><div class="label">水温</div><div class="value" id="res-temp">--</div></div>
+    <div class="card full"><div class="label">指摘事項 (最新)</div><div class="value" id="res-note" style="font-size: 1em;">--</div></div>
 </div>
 
-<div id="log-area">>> システムログ待機...</div>
+<div id="log"></div>
 
 <script>
     /** ★ここにGASのウェブアプリURLを貼り付け★ */
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzF9N8WTcDQCMf0Sy43yeHPc3avSyh6i66-tiWSxI1xEkHF0hfw3xXTxfK7YdSFxY72zw/exec";
 
-    const inspectors = ["守矢", "長嶋祐樹", "永嶋秀記", "高田", "高嶋", "江刺", "金井", "渋谷", "関根", "島村", "西村", "吉田", "吉澤"];
+    const inspectors = ["守矢", "高田", "金井", "長嶋祐樹", "江刺", "吉田", "永嶋秀記", "渋谷", "高嶋"];
     let state = { inspector: "", ph: "", do: "", toshido: "", cl: "", temp: "", note1: "", note2: "", note3: "", note4: "", note5: "", note6: "", note7: "" };
 
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    // --- 音声合成（口）の設定 ---
+    const synth = window.speechSynthesis;
+    function speak(text) {
+        if (!text) return;
+        // 以前の読み上げをキャンセル
+        synth.cancel();
+        const uttr = new SpeechSynthesisUtterance(text);
+        uttr.lang = 'ja-JP';
+        uttr.rate = 1.2;
+        synth.speak(uttr);
+    }
+
+    // --- 音声認識（耳）の設定 ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
     recognition.lang = 'ja-JP';
     recognition.continuous = true;
     recognition.interimResults = false;
 
-    function speak(text) {
-        const uttr = new SpeechSynthesisUtterance(text);
-        uttr.lang = 'ja-JP';
-        uttr.rate = 1.2;
-        window.speechSynthesis.speak(uttr);
-    }
-
+    // 開始ボタン
     document.getElementById('start-btn').onclick = () => {
         document.getElementById('start-overlay').style.display = 'none';
+        // ブラウザの音声制限を解除するための「空読み上げ」
+        speak("システムを起動しました。");
         recognition.start();
-        speak("検査表システム起動。検査員名を教えてください。");
+        document.getElementById('mic-icon').className = "listening";
+        document.getElementById('status').innerText = "聴取中...";
     };
 
     recognition.onresult = (event) => {
-        const cmd = event.results[event.results.length - 1][0].transcript.replace(/\s+/g, "");
-        log("聞取: " + cmd);
-        processCommand(cmd);
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        const cleanCmd = kanjiToNum(transcript.toLowerCase().replace(/\s+/g, ""));
+        addLog(cleanCmd);
+        analyze(cleanCmd);
     };
 
-    // 自動再起動（止まっても無理やり動かす）
-    recognition.onend = () => {
-        log("マイク再起動中...");
-        recognition.start();
-    };
+    recognition.onend = () => recognition.start(); // 止まっても再起動
 
-    function processCommand(cmd) {
-        // 1. ログイン処理
+    // --- 解析ロジック（活舌対策） ---
+    function analyze(cmd) {
+        // 1. ログイン（名前に「です」や「さん」が付いてもOK）
         if (!state.inspector) {
-            const found = inspectors.find(n => cmd.includes(n));
-            if (found) {
-                state.inspector = found;
-                document.getElementById('user-display').innerText = "検査員: " + found;
-                speak(found + "さん、おつかれさまです。検査を開始します。");
+            const user = inspectors.find(n => cmd.includes(n));
+            if (user) {
+                state.inspector = user;
+                document.getElementById('user-name').innerText = user + " 検査員";
+                speak(user + "さん、こんにちは。準備完了です。");
             }
             return;
         }
 
-        // 2. 送信コマンド
-        if (cmd.includes("送信") || cmd.includes("完了") || cmd.includes("終了")) {
-            if (!state.ph && !state.do) {
-                speak("データが入力されていません。");
-                return;
-            }
-            speak("スプレッドシートに保存します。少々お待ちください。");
-            sendToGas();
+        // 2. 送信・完了
+        if (cmd.includes("送信") || cmd.includes("完了") || cmd.includes("終わり") || cmd.includes("おわり")) {
+            speak("スプレッドシートに保存します。");
+            sendData();
             return;
         }
 
-        // 3. 修正コマンド
-        if (cmd.includes("間違い") || cmd.includes("直し") || cmd.includes("キャンセル")) {
-            speak("直前の入力を取り消しました。");
-            return; 
-        }
-
-        // 4. 数値・項目解析
-        let num = cmd.match(/\d+(\.\d+)?/)?.[0];
+        // 3. 項目マッチング（あだ名リスト）
+        const num = cmd.match(/\d+(\.\d+)?/)?.[0];
         
-        if (cmd.includes("ピーエイチ") || cmd.includes("pH")) {
+        if (match(cmd, ["ピーエイチ", "ピエチ", "ヒエチ", "ph", "ベーハー"])) {
             state.ph = num;
-            updateUI('v-ph', num);
-            speak("ピーエイチ、" + num);
-        } else if (cmd.includes("ディーオー") || cmd.includes("DO")) {
+            updateUI("res-ph", num);
+            speak("ピーエイチ " + num);
+        } else if (match(cmd, ["ディーオー", "デオ", "ディオ", "do"])) {
             state.do = num;
-            updateUI('v-do', num);
-            speak("ディーオー、" + num);
-        } else if (cmd.includes("透視度")) {
+            updateUI("res-do", num);
+            speak("ディーオー " + num);
+        } else if (match(cmd, ["透視度", "とうし", "透明"])) {
             state.toshido = num;
-            updateUI('v-toshido', num);
-            speak("透視度、" + num);
-        } else if (cmd.includes("塩素")) {
-            let res = cmd.includes("不検出") ? "不検出" : (cmd.includes("検出") ? "検出" : num);
-            state.cl = res;
-            updateUI('v-cl', res);
-            speak("塩素、" + res);
-        } else if (cmd.includes("水温")) {
+            updateUI("res-toshido", num);
+            speak("透視度 " + num);
+        } else if (match(cmd, ["塩素", "残留", "えんそ"])) {
+            let clVal = cmd.includes("不検出") ? "不検出" : (cmd.includes("検出") ? "検出" : num);
+            state.cl = clVal;
+            updateUI("res-cl", clVal);
+            speak("塩素 " + clVal);
+        } else if (match(cmd, ["水温", "すいおん", "温度"])) {
             state.temp = num;
-            updateUI('v-temp', num);
-            speak("水温、" + num);
-        } else if (cmd.includes("指摘")) {
-            const nMatch = cmd.match(/指摘([1-7])/);
-            const index = nMatch ? nMatch[1] : "1";
-            const text = cmd.replace(/.*指摘[1-7]?/, "");
-            state['note' + index] = text;
-            updateUI('v-note', text);
-            speak("指摘" + index + "、了解。");
+            updateUI("res-temp", num);
+            speak("水温 " + num);
+        } else if (match(cmd, ["指摘", "してき", "異常"])) {
+            const idx = cmd.match(/[1-7]/)?.[0] || "1";
+            const note = cmd.split(/指摘[1-7]?|異常/)[1] || cmd;
+            state["note" + idx] = note;
+            updateUI("res-note", note);
+            speak("指摘" + idx + " 了解");
         }
+    }
+
+    // 複数の言葉のどれかに当たればOKとする関数
+    function match(cmd, list) {
+        return list.some(word => cmd.includes(word));
+    }
+
+    // 漢数字を数字に直す（活舌が悪いと漢字で認識されやすいため）
+    function kanjiToNum(str) {
+        const kanji = {"ゼロ":0,"一":1,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"点":"."};
+        return str.replace(/[一二三四五六七八九ゼロ点]/g, s => kanji[s]);
     }
 
     function updateUI(id, val) {
-        document.getElementById(id).innerText = val;
-        document.getElementById(id).style.color = "#55efc4";
-        setTimeout(() => { document.getElementById(id).style.color = "#00d2ff"; }, 1000);
+        document.getElementById(id).innerText = val || "--";
     }
 
-    function sendToGas() {
+    function addLog(m) {
+        const l = document.getElementById('log');
+        l.innerHTML = "<div>" + m + "</div>" + l.innerHTML;
+    }
+
+    function sendData() {
         fetch(GAS_URL, {
             method: "POST",
             body: JSON.stringify(state)
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.result === "success") {
-                speak("保存完了。次の現場へどうぞ。");
-                resetForm();
-            } else {
-                speak("エラーが発生しました。");
-            }
-        })
-        .catch(e => speak("通信エラーです。"));
+        }).then(() => {
+            speak("保存しました。次の現場へリセットします。");
+            reset();
+        }).catch(() => speak("通信エラーです。"));
     }
 
-    function resetForm() {
-        ["ph","do","toshido","cl","temp","note1","note2","note3","note4","note5","note6","note7"].forEach(k => state[k] = "");
-        ["v-ph","v-do","v-toshido","v-cl","v-temp","v-note"].forEach(id => document.getElementById(id).innerText = "--");
-    }
-
-    function log(m) {
-        const l = document.getElementById('log-area');
-        l.innerHTML += "<div>" + m + "</div>";
-        l.scrollTop = l.scrollHeight;
+    function reset() {
+        Object.keys(state).forEach(k => { if(k!=="inspector") state[k]=""; });
+        ["res-ph","res-do","res-toshido","res-cl","res-temp","res-note"].forEach(id => document.getElementById(id).innerText="--");
     }
 </script>
 </body>
