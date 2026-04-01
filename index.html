@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTROY-V8-NAME-MASTER</title>
+    <title>DESTROY-V9-HISTORY</title>
     <style>
         :root { --bg: #000; --card: #111; --accent: #00e5ff; --danger: #ff0055; --success: #00ff66; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
@@ -12,21 +12,25 @@
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .card { background: var(--card); padding: 10px; border-left: 4px solid var(--accent); border-radius: 4px; }
         .label { font-size: 0.7em; color: var(--accent); }
-        .value { font-size: 1.6em; font-weight: bold; }
+        .value { font-size: 1.5em; font-weight: bold; }
         .btn-group { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .main-btn { padding: 18px; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; }
-        #save-btn { background: var(--success); color: #000; }
-        #log { background: #000; height: 40px; overflow-y: auto; font-size: 0.7em; padding: 5px; color: var(--danger); border-top: 1px solid #333; }
-        .note-row { font-size: 0.8em; color: #bbb; border-bottom: 1px solid #222; padding: 2px 0; }
+        .main-btn { padding: 18px; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; color: #000; }
+        #save-btn { background: var(--success); }
+        #list-btn { background: var(--accent); }
+        #history-area { display: none; margin-top: 15px; background: #111; border: 1px solid var(--accent); padding: 10px; border-radius: 8px; font-size: 0.8em; max-height: 250px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        th { border-bottom: 1px solid var(--accent); text-align: left; color: var(--accent); padding: 5px; }
+        td { border-bottom: 1px solid #222; padding: 8px 5px; }
+        #log { background: #000; height: 40px; overflow-y: auto; font-size: 0.7em; padding: 5px; color: var(--danger); border-top: 1px solid #333; margin-top: 10px; }
         .listening { color: var(--danger); animation: blink 0.8s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
     </style>
 </head>
 <body>
 
-<div id="start-overlay"><button id="start-btn">DESTROY<br>V8 START</button></div>
+<div id="start-overlay"><button id="start-btn">DESTROY<br>V9 START</button></div>
 
-<div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 5px; background: #111;">
+<div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 8px; background: #111;">
     <div><span id="mic-status">●</span> <span id="status-text">待機</span></div>
     <div id="user-display" style="color: var(--accent); font-weight: bold;">ログインしてください</div>
 </div>
@@ -37,30 +41,38 @@
     <div class="card"><div class="label">透視度 (Tr)</div><div class="value" id="res-toshido">--</div></div>
     <div class="card"><div class="label">残留塩素</div><div class="value" id="res-cl">--</div></div>
     <div class="card"><div class="label">水温</div><div class="value" id="res-temp">--</div></div>
-    <div class="card" style="grid-column: span 2;"><div class="label">指摘 (1-7) / メモ</div><div id="note-display"></div></div>
+    <div class="card" style="grid-column: span 2;"><div class="label">指摘 (1-7)</div><div id="note-display" style="font-size: 0.85em; min-height: 40px; color: #ccc;">--</div></div>
 </div>
 
 <div id="log"></div>
 
 <div class="btn-group">
     <button id="save-btn" class="main-btn">💾 スプレッドシートへ保存</button>
+    <button id="list-btn" class="main-btn">📋 当日の履歴を確認</button>
+</div>
+
+<div id="history-area">
+    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+        <b style="color:var(--accent);">本日のあなたの履歴</b>
+        <span onclick="document.getElementById('history-area').style.display='none'" style="cursor:pointer;">[閉じる]</span>
+    </div>
+    <div id="history-content"></div>
 </div>
 
 <script>
     /** ★ここにGASのURLを貼り付け★ */
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzF9N8WTcDQCMf0Sy43yeHPc3avSyh6i66-tiWSxI1xEkHF0hfw3xXTxfK7YdSFxY72zw/exec";
 
-    // 9名の精鋭検査員リスト（超・広域判定仕様）
     const inspectors = [
-        {k: "守矢", a: ["もりや", "守谷", "守矢", "森屋", "モリヤ", "もり"]},
-        {k: "金井", a: ["かない", "金井", "家内", "カナ"]},
-        {k: "長嶋祐樹", a: ["ながしまゆうき", "長嶋祐樹", "長島祐樹", "永島祐樹", "ゆうき", "ながしま"]},
-        {k: "永嶋秀記", a: ["ながしまひでき", "永嶋秀記", "永島秀記", "永島英記", "ひでき"]},
-        {k: "高田", a: ["たかだ", "たかた", "高田", "タカダ"]},
-        {k: "吉田", a: ["よしだ", "吉田", "ヨシダ", "よし"]},
-        {k: "江刺", a: ["えさし", "江刺", "江差", "餌差し", "えさ"]},
-        {k: "高嶋", a: ["たかしま", "高嶋", "高島", "タカシマ"]},
-        {k: "渋谷", a: ["しぶや", "渋谷", "シブヤ", "しぶ"]}
+        {k: "守矢", a: ["もりや", "守谷", "守矢", "モリヤ"]},
+        {k: "金井", a: ["かない", "金井", "カナ"]},
+        {k: "長嶋祐樹", a: ["ながしまゆうき", "長嶋祐樹", "長島祐樹", "ゆうき"]},
+        {k: "永嶋秀記", a: ["ながしまひでき", "永嶋秀記", "ひでき"]},
+        {k: "高田", a: ["たかだ", "高田"]},
+        {k: "吉田", a: ["よしだ", "吉田"]},
+        {k: "江刺", a: ["えさし", "江刺", "えさ"]},
+        {k: "高嶋", a: ["たかしま", "高嶋", "高島"]},
+        {k: "渋谷", a: ["しぶや", "渋谷"]}
     ];
     
     let state = { inspector: "", ph: "", do: "", toshido: "", cl: "", temp: "", note1:"", note2:"", note3:"", note4:"", note5:"", note6:"", note7:"" };
@@ -80,7 +92,7 @@
 
     document.getElementById('start-btn').onclick = () => {
         document.getElementById('start-overlay').style.display = 'none';
-        speak("起動しました。お名前をどうぞ。");
+        speak("起動。名前をどうぞ。");
         recognition.start();
         updateStatus(true);
     };
@@ -94,7 +106,7 @@
     };
 
     function cleanVoiceInput(str) {
-        return str.replace(/投資|当事|当時|糖度|等速|透明|トウド|ドウド|tr|ティーアール|ミズ|みず/g, "透視度")
+        return str.replace(/投資|当事|当時|糖度|透明|トウド|ドウド|tr|ティーアール|ミズ|みず/g, "透視度")
                   .replace(/デーオー|デオ|ディーオー|どう|どお/g, "do")
                   .replace(/シテキ|してき|メモ|めも|異常|いじょう/g, "指摘");
     }
@@ -102,18 +114,17 @@
     recognition.onend = () => { if (!isLocked) recognition.start(); };
 
     function analyze(cmd) {
-        if (match(cmd, ["終了", "終わり", "ストップ"])) {
+        if (match(cmd, ["終了", "ストップ"])) {
             isLocked = true; recognition.stop(); updateStatus(false);
-            speak("音声終了。"); return;
+            speak("音声入力を停止しました。"); return;
         }
 
-        // 検査員判定：9名のうち誰かの名前にかすっていれば即ログイン
         if (!state.inspector) {
             const user = inspectors.find(i => i.a.some(a => cmd.includes(a)));
             if (user) {
                 state.inspector = user.k;
                 document.getElementById('user-display').innerText = "検査員: " + user.k;
-                speak(user.k + "さん、了解。数値をどうぞ。");
+                speak(user.key + "さん、了解。");
             }
             return;
         }
@@ -147,7 +158,7 @@
 
     function renderNotes() {
         let h = "";
-        for(let i=1; i<=7; i++) if(state["note"+i]) h += `<div class="note-row">[${i}] ${state["note"+i]}</div>`;
+        for(let i=1; i<=7; i++) if(state["note"+i]) h += `<div>[${i}] ${state["note"+i]}</div>`;
         document.getElementById('note-display').innerHTML = h || "--";
     }
 
@@ -156,6 +167,32 @@
         speak("保存します。");
         fetch(GAS_URL, { method: "POST", body: JSON.stringify(state) })
         .then(() => { speak("完了"); setTimeout(()=>location.reload(), 1000); });
+    };
+
+    // --- 履歴表示ロジック ---
+    document.getElementById('list-btn').onclick = () => {
+        if (!state.inspector) { alert("ログインが必要です"); return; }
+        const area = document.getElementById('history-area');
+        const content = document.getElementById('history-content');
+        area.style.display = "block";
+        content.innerHTML = "読み込み中...";
+        
+        fetch(GAS_URL + "?name=" + encodeURIComponent(state.inspector))
+        .then(res => res.json())
+        .then(data => {
+            if (data.length === 0) {
+                content.innerHTML = "本日のデータは見つかりませんでした。";
+                return;
+            }
+            let html = "<table><tr><th>時刻</th><th>pH</th><th>DO</th><th>Tr</th></tr>";
+            data.forEach(row => {
+                const time = new Date(row[0]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                html += `<tr><td>${time}</td><td>${row[2]}</td><td>${row[3]}</td><td>${row[4]}</td></tr>`;
+            });
+            html += "</table>";
+            content.innerHTML = html;
+        })
+        .catch(e => content.innerHTML = "エラーが発生しました。");
     };
 
     function updateUI(id, val) { document.getElementById(id).innerText = val || "--"; }
