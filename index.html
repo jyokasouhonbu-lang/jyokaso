@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>検査表音声入力 - DESTROY EDITION</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: #fff; text-align: center; padding: 20px; }
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #start-btn { padding: 30px 60px; font-size: 2em; background: #e63946; color: white; border: none; border-radius: 100px; cursor: pointer; }
+        .status { font-size: 1.5em; color: #a8dadc; margin-bottom: 20px; }
+        #debug-log { background: #333; height: 150px; overflow-y: auto; text-align: left; padding: 10px; font-size: 0.8em; border: 1px solid #555; }
+        .card { background: #457b9d; padding: 20px; border-radius: 15px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div id="start-overlay">
+    <button id="start-btn">検査開始（最初の一撃）</button>
+    <p>※一度押せば、あとは車に戻るまで触りません</p>
+</div>
+
+<div class="status" id="mic-status">待機中</div>
+<div id="debug-log">システムログを表示中...</div>
+
+<div class="card">
+    <div id="cur-label">項目をどうぞ</div>
+    <div id="cur-value" style="font-size: 2.5em; font-weight: bold;">---</div>
+</div>
+
+<script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzF9N8WTcDQCMf0Sy43yeHPc3avSyh6i66-tiWSxI1xEkHF0hfw3xXTxfK7YdSFxY72zw/exec";
+    const inspectors = ["守矢", "高田", "吉田", "長嶋祐樹", "永嶋秀記", "吉澤", "江刺", "高嶋", "金井", "渋谷", "関根", "島村", "西村"];
+    
+    let state = { inspector: "", ph: "", do: "", toshido: "", cl: "", temp: "", note1: "", note2: "", note3: "", note4: "", note5: "", note6: "", note7: "" };
+
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'ja-JP';
+    recognition.continuous = true;
+
+    function speak(text) {
+        const uttr = new SpeechSynthesisUtterance(text);
+        const voices = window.speechSynthesis.getVoices();
+        uttr.voice = voices.find(v => v.lang === 'ja-JP') || voices[0];
+        uttr.rate = 1.1;
+        window.speechSynthesis.speak(uttr);
+    }
+
+    document.getElementById('start-btn').onclick = () => {
+        document.getElementById('start-overlay').style.display = 'none';
+        recognition.start();
+        speak("検査表入力システム起動。検査員名を教えてください。");
+    };
+
+    recognition.onresult = (event) => {
+        const cmd = event.results[event.results.length - 1][0].transcript;
+        log("> " + cmd);
+        processCommand(cmd);
+    };
+
+    recognition.onend = () => recognition.start(); // 永久ループで聞き続ける
+
+    function processCommand(cmd) {
+        // 名前判定
+        if (!state.inspector) {
+            const found = inspectors.find(n => cmd.includes(n));
+            if (found) {
+                state.inspector = found;
+                speak(found + "さん、了解。数値をどうぞ。");
+                document.getElementById('mic-status').innerText = "担当：" + found;
+            }
+            return;
+        }
+
+        // 保存送信
+        if (cmd.includes("送信") || cmd.includes("完了")) {
+            speak("スプレッドシートに転送します。");
+            fetch(GAS_URL, {
+                method: "POST",
+                body: JSON.stringify(state)
+            }).then(() => {
+                speak("保存完了。次の現場をどうぞ。");
+                resetForm();
+            });
+            return;
+        }
+
+        // 数値抽出と各項目への振り分け
+        let val = cmd.match(/\d+(\.\d+)?/)?.[0];
+        if (cmd.includes("ピーエイチ") || cmd.includes("pH")) { state.ph = val; speak("pH " + val); }
+        else if (cmd.includes("DO") || cmd.includes("ディーオー") || cmd.includes("利用")) { state.do = val; speak("DO " + val); }
+        else if (cmd.includes("透視")) { state.toshido = val; speak("透視度 " + val); }
+        else if (cmd.includes("塩素")) {
+            state.cl = cmd.includes("不検出") ? "不検出" : (cmd.includes("検出") ? "検出" : val);
+            speak("塩素 " + state.cl);
+        }
+        else if (cmd.includes("指摘")) {
+            const n = cmd.match(/[1-7]/)?.[0] || "1";
+            state['note'+n] = cmd.replace(/.*指摘事項[1-7]?/, "");
+            speak("指摘" + n + "了解");
+        }
+        
+        document.getElementById('cur-value').innerText = val || "了解";
+    }
+
+    function log(m) {
+        const d = document.getElementById('debug-log');
+        d.innerHTML += "<br>" + m;
+        d.scrollTop = d.scrollHeight;
+    }
+
+    function resetForm() {
+        Object.keys(state).forEach(k => { if(k !== "inspector") state[k] = ""; });
+    }
+</script>
+</body>
+</html>
