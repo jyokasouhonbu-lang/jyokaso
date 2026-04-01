@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTROY-V9-HISTORY</title>
+    <title>DESTROY-V10-RECOVERY</title>
     <style>
         :root { --bg: #000; --card: #111; --accent: #00e5ff; --danger: #ff0055; --success: #00ff66; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
@@ -28,7 +28,7 @@
 </head>
 <body>
 
-<div id="start-overlay"><button id="start-btn">DESTROY<br>V9 START</button></div>
+<div id="start-overlay"><button id="start-btn">DESTROY<br>V10 START</button></div>
 
 <div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 8px; background: #111;">
     <div><span id="mic-status">●</span> <span id="status-text">待機</span></div>
@@ -64,10 +64,10 @@
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzF9N8WTcDQCMf0Sy43yeHPc3avSyh6i66-tiWSxI1xEkHF0hfw3xXTxfK7YdSFxY72zw/exec";
 
     const inspectors = [
-        {k: "守矢", a: ["もりや", "守谷", "守矢", "モリヤ"]},
+        {k: "守矢", a: ["もりや", "守谷", "守矢", "モリヤ", "デストロイ", "もり"]},
         {k: "金井", a: ["かない", "金井", "カナ"]},
-        {k: "長嶋祐樹", a: ["ながしまゆうき", "長嶋祐樹", "長島祐樹", "ゆうき"]},
-        {k: "永嶋秀記", a: ["ながしまひでき", "永嶋秀記", "ひでき"]},
+        {k: "長嶋祐樹", a: ["ながしまゆうき", "長嶋祐樹", "トランプ", "長島祐樹", "ゆうき"]},
+        {k: "永嶋秀記", a: ["ながしまひでき", "ジョージ", "永嶋秀記", "ひでき"]},
         {k: "高田", a: ["たかだ", "高田"]},
         {k: "吉田", a: ["よしだ", "吉田"]},
         {k: "江刺", a: ["えさし", "江刺", "えさ"]},
@@ -80,7 +80,8 @@
 
     const synth = window.speechSynthesis;
     function speak(text) {
-        synth.cancel();
+        if (!text) return;
+        synth.cancel(); // 前の読み上げを強制停止
         const uttr = new SpeechSynthesisUtterance(text);
         uttr.lang = 'ja-JP'; uttr.rate = 1.3;
         synth.speak(uttr);
@@ -92,7 +93,7 @@
 
     document.getElementById('start-btn').onclick = () => {
         document.getElementById('start-overlay').style.display = 'none';
-        speak("起動。名前をどうぞ。");
+        speak("システム起動。お名前を。");
         recognition.start();
         updateStatus(true);
     };
@@ -116,15 +117,16 @@
     function analyze(cmd) {
         if (match(cmd, ["終了", "ストップ"])) {
             isLocked = true; recognition.stop(); updateStatus(false);
-            speak("音声入力を停止しました。"); return;
+            speak("音声終了。"); return;
         }
 
+        // --- 名前の復唱バグ修正箇所 ---
         if (!state.inspector) {
             const user = inspectors.find(i => i.a.some(a => cmd.includes(a)));
             if (user) {
-                state.inspector = user.k;
+                state.inspector = user.k; // 内部データに保存
                 document.getElementById('user-display').innerText = "検査員: " + user.k;
-                speak(user.key + "さん、了解。");
+                speak(user.k + "さん、了解しました。"); // user.keyではなくuser.kを使用
             }
             return;
         }
@@ -132,7 +134,7 @@
         const num = cmd.match(/\d+(\.\d+)?/)?.[0];
         
         if (match(cmd, ["ペーハー", "ベーハー", "ph"])) {
-            state.ph = num; updateUI("res-ph", num); speak("PH " + num);
+            state.ph = num; updateUI("res-ph", num); speak("ペーハー " + num);
         } else if (match(cmd, ["do"])) {
             state.do = num; updateUI("res-do", num); speak("デーオー " + num);
         } else if (match(cmd, ["透視度"])) {
@@ -145,7 +147,7 @@
         } else if (match(cmd, ["指摘"])) {
             const idxMatch = cmd.match(/([1-7])/);
             const idx = idxMatch ? idxMatch[1] : "1";
-            const note = cmd.split(/指摘[1-7]?/)[1] || "異常あり";
+            const note = cmd.split(/指摘[1-7]?/)[1] || "入力あり";
             state["note" + idx] = note; renderNotes(); speak("指摘" + idx + "了解");
         }
     }
@@ -166,24 +168,19 @@
         if (!state.inspector) return;
         speak("保存します。");
         fetch(GAS_URL, { method: "POST", body: JSON.stringify(state) })
-        .then(() => { speak("完了"); setTimeout(()=>location.reload(), 1000); });
+        .then(() => { speak("保存しました。"); setTimeout(()=>location.reload(), 1000); });
     };
 
-    // --- 履歴表示ロジック ---
     document.getElementById('list-btn').onclick = () => {
-        if (!state.inspector) { alert("ログインが必要です"); return; }
+        if (!state.inspector) return;
         const area = document.getElementById('history-area');
         const content = document.getElementById('history-content');
         area.style.display = "block";
-        content.innerHTML = "読み込み中...";
-        
+        content.innerHTML = "読込中...";
         fetch(GAS_URL + "?name=" + encodeURIComponent(state.inspector))
         .then(res => res.json())
         .then(data => {
-            if (data.length === 0) {
-                content.innerHTML = "本日のデータは見つかりませんでした。";
-                return;
-            }
+            if (data.length === 0) { content.innerHTML = "今日のデータはありません"; return; }
             let html = "<table><tr><th>時刻</th><th>pH</th><th>DO</th><th>Tr</th></tr>";
             data.forEach(row => {
                 const time = new Date(row[0]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -191,8 +188,7 @@
             });
             html += "</table>";
             content.innerHTML = html;
-        })
-        .catch(e => content.innerHTML = "エラーが発生しました。");
+        });
     };
 
     function updateUI(id, val) { document.getElementById(id).innerText = val || "--"; }
