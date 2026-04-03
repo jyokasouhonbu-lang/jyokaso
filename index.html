@@ -3,202 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTROY-V10-RECOVERY</title>
+    <title>DESTROY-ULTIMATE-V11</title>
     <style>
-        :root { --bg: #000; --card: #111; --accent: #00e5ff; --danger: #ff0055; --success: #00ff66; }
-        body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
-        #start-overlay { position: fixed; inset: 0; background: #000; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #start-btn { width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--danger); background: #000; color: #fff; font-size: 1.2em; font-weight: bold; cursor: pointer; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .card { background: var(--card); padding: 10px; border-left: 4px solid var(--accent); border-radius: 4px; }
-        .label { font-size: 0.7em; color: var(--accent); }
-        .value { font-size: 1.5em; font-weight: bold; }
-        .btn-group { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
-        .main-btn { padding: 18px; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; color: #000; }
-        #save-btn { background: var(--success); }
-        #list-btn { background: var(--accent); }
-        #history-area { display: none; margin-top: 15px; background: #111; border: 1px solid var(--accent); padding: 10px; border-radius: 8px; font-size: 0.8em; max-height: 250px; overflow-y: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-        th { border-bottom: 1px solid var(--accent); text-align: left; color: var(--accent); padding: 5px; }
-        td { border-bottom: 1px solid #222; padding: 8px 5px; }
-        #log { background: #000; height: 40px; overflow-y: auto; font-size: 0.7em; padding: 5px; color: var(--danger); border-top: 1px solid #333; margin-top: 10px; }
-        .listening { color: var(--danger); animation: blink 0.8s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+        :root { --bg: #0a0a0a; --card: #1a1a1a; --accent: #00f2ff; --danger: #ff0055; --success: #00ff88; }
+        body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 15px; }
+        .hidden { display: none !important; }
+        
+        /* ログイン画面 */
+        #login-screen { text-align: center; margin-top: 50px; }
+        select, input { width: 80%; padding: 15px; margin: 10px 0; background: #222; color: #fff; border: 1px solid var(--accent); border-radius: 8px; font-size: 1.1em; }
+        
+        /* メイン画面 */
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 15px; }
+        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8em; font-weight: bold; }
+        .active { background: var(--danger); animation: blink 1s infinite; }
+        
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .card { background: var(--card); padding: 15px; border-radius: 10px; border-left: 5px solid var(--accent); }
+        .card.full { grid-column: span 2; }
+        .val { font-size: 1.5em; font-weight: bold; color: var(--success); }
+        
+        /* 履歴テーブル */
+        #history { margin-top: 20px; width: 100%; border-collapse: collapse; font-size: 0.8em; }
+        #history th, #history td { border-bottom: 1px solid #333; padding: 10px; text-align: left; }
+        
+        .btn { width: 100%; padding: 20px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        #logout-btn { position: fixed; bottom: 10px; right: 10px; width: auto; padding: 10px; background: #333; color: #ccc; font-size: 0.7em; }
+        
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     </style>
 </head>
 <body>
 
-<div id="start-overlay"><button id="start-btn">DESTROY<br>V10 START</button></div>
-
-<div style="display: flex; justify-content: space-between; font-size: 0.8em; padding: 8px; background: #111;">
-    <div><span id="mic-status">●</span> <span id="status-text">待機</span></div>
-    <div id="user-display" style="color: var(--accent); font-weight: bold;">ログインしてください</div>
+<div id="login-screen">
+    <h1>DESTROY LOGIN</h1>
+    <select id="user-select"><option>読み込み中...</option></select>
+    <input type="password" id="pin-input" placeholder="PIN CODE (4桁)" maxlength="4" inputmode="numeric">
+    <button class="btn" style="background: var(--accent);" onclick="attemptLogin()">AUTHENTICATE</button>
 </div>
 
-<div class="grid">
-    <div class="card"><div class="label">pH</div><div class="value" id="res-ph">--</div></div>
-    <div class="card"><div class="label">DO</div><div class="value" id="res-do">--</div></div>
-    <div class="card"><div class="label">透視度 (Tr)</div><div class="value" id="res-toshido">--</div></div>
-    <div class="card"><div class="label">残留塩素</div><div class="value" id="res-cl">--</div></div>
-    <div class="card"><div class="label">水温</div><div class="value" id="res-temp">--</div></div>
-    <div class="card" style="grid-column: span 2;"><div class="label">指摘 (1-7)</div><div id="note-display" style="font-size: 0.85em; min-height: 40px; color: #ccc;">--</div></div>
-</div>
-
-<div id="log"></div>
-
-<div class="btn-group">
-    <button id="save-btn" class="main-btn">💾 スプレッドシートへ保存</button>
-    <button id="list-btn" class="main-btn">📋 当日の履歴を確認</button>
-</div>
-
-<div id="history-area">
-    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-        <b style="color:var(--accent);">本日のあなたの履歴</b>
-        <span onclick="document.getElementById('history-area').style.display='none'" style="cursor:pointer;">[閉じる]</span>
+<div id="main-screen" class="hidden">
+    <div class="header">
+        <div><span id="mic-status" class="status-badge">STANDBY</span></div>
+        <div id="display-name">---</div>
     </div>
-    <div id="history-content"></div>
+
+    <div class="grid">
+        <div class="card"><div class="label">pH</div><div class="val" id="v-ph">--</div></div>
+        <div class="card"><div class="label">DO</div><div class="val" id="v-do">--</div></div>
+        <div class="card"><div class="label">透視度</div><div class="val" id="v-toshido">--</div></div>
+        <div class="card"><div class="label">残留塩素</div><div class="val" id="v-cl">--</div></div>
+        <div class="card"><div class="label">水温</div><div class="val" id="v-temp">--</div></div>
+        <div class="card"><div class="label">汚泥沈殿率</div><div class="val" id="v-odei">--</div></div>
+        <div class="card full"><div class="label">メモ (追記型)</div><div id="v-memo" style="font-size:0.9em; color:#aaa;"></div></div>
+    </div>
+
+    <button id="list-btn" class="btn" style="background: var(--card); color: var(--accent); border: 1px solid var(--accent);" onclick="loadTodayLogs()">本日の履歴を確認</button>
+    
+    <table id="history"></table>
+
+    <button id="logout-btn" onclick="logout()">LOGOUT / 切り替え</button>
 </div>
 
 <script>
-    /** ★ここにGASのURLを貼り付け★ */
+    /** ★ここにGASのウェブアプリURLを貼り付け★ */
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzF9N8WTcDQCMf0Sy43yeHPc3avSyh6i66-tiWSxI1xEkHF0hfw3xXTxfK7YdSFxY72zw/exec";
 
-    const inspectors = [
-        {k: "守矢", a: ["もりや", "守谷", "守矢", "モリヤ", "デストロイ", "もり"]},
-        {k: "金井", a: ["かない", "金井", "カナ"]},
-        {k: "長嶋祐樹", a: ["ながしまゆうき", "長嶋祐樹", "トランプ", "長島祐樹", "ゆうき"]},
-        {k: "永嶋秀記", a: ["ながしまひでき", "マイク", "永嶋秀記", "ひでき"]},
-        {k: "高田", a: ["たかだ", "高田"]},
-        {k: "吉田", a: ["よしだ", "吉田"]},
-        {k: "江刺", a: ["えさし", "江刺", "えさ"]},
-        {k: "高嶋", a: ["たかしま", "高嶋", "高島"]},
-        {k: "渋谷", a: ["しぶや", "渋谷"]}
-    ];
-    
-    let state = { inspector: "", ph: "", do: "", toshido: "", cl: "", temp: "", note1:"", note2:"", note3:"", note4:"", note5:"", note6:"", note7:"" };
-    let isLocked = false;
+    let currentUser = localStorage.getItem('destroy_user');
+    let wakeLock = null;
+    let isInspectionActive = false;
+    let sessionData = {}; // メモ以外の項目の一時保持（上書き用）
+
+    // 辞書設定
+    const dictionary = {
+        ph: ["ピーエイチ", "ペーハー", "ベーハー", "ph"],
+        do: ["ディーオー", "デーオー", "デオ", "do"],
+        toshido: ["透視", "トウシ", "トウメイド", "ティーアール", "tr", "ミズ"],
+        cl: ["残留塩素", "塩素", "ザンリュウ", "えんそ"],
+        temp: ["水温", "スイオン", "温度"],
+        odei: ["汚泥", "ちんでん", "オデイ"],
+        memo: ["メモ", "備考", "シテキ", "指摘"]
+    };
 
     const synth = window.speechSynthesis;
-    function speak(text) {
-        if (!text) return;
-        synth.cancel(); // 前の読み上げを強制停止
-        const uttr = new SpeechSynthesisUtterance(text);
-        uttr.lang = 'ja-JP'; uttr.rate = 1.3;
-        synth.speak(uttr);
-    }
-
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    recognition.lang = 'ja-JP'; recognition.continuous = true;
+    recognition.lang = 'ja-JP';
+    recognition.continuous = true;
+    recognition.interimResults = false;
 
-    document.getElementById('start-btn').onclick = () => {
-        document.getElementById('start-overlay').style.display = 'none';
-        speak("システム起動。お名前を。");
-        recognition.start();
-        updateStatus(true);
+    window.onload = async () => {
+        // ユーザーリスト取得
+        const res = await fetch(`${GAS_URL}?action=getUsers`);
+        const users = await res.json();
+        const select = document.getElementById('user-select');
+        select.innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
+
+        if (currentUser) {
+            const lastLogin = localStorage.getItem('destroy_date');
+            if (lastLogin === new Date().toLocaleDateString()) {
+                showMain();
+            }
+        }
     };
 
-    recognition.onresult = (event) => {
-        if (isLocked) return;
-        const transcript = event.results[event.results.length - 1][0].transcript;
-        const cmd = kanjiToNum(transcript.toLowerCase().replace(/\s+/g, ""));
-        addLog(cmd);
-        analyze(cleanVoiceInput(cmd));
-    };
-
-    function cleanVoiceInput(str) {
-        return str.replace(/投資|当事|当時|糖度|透明|トウド|ドウド|tr|ティーアール|ミズ|みず/g, "透視度")
-                  .replace(/デーオー|デオ|ディーオー|どう|どお/g, "do")
-                  .replace(/シテキ|してき|メモ|めも|異常|いじょう/g, "指摘");
+    async function attemptLogin() {
+        const name = document.getElementById('user-select').value;
+        const pin = document.getElementById('pin-input').value;
+        const res = await fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "login", name, pin })
+        });
+        const result = await res.json();
+        if (result.success) {
+            currentUser = name;
+            localStorage.setItem('destroy_user', name);
+            localStorage.setItem('destroy_date', new Date().toLocaleDateString());
+            showMain();
+        } else {
+            alert("PINが違います");
+        }
     }
 
-    recognition.onend = () => { if (!isLocked) recognition.start(); };
+    function showMain() {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-screen').classList.remove('hidden');
+        document.getElementById('display-name').innerText = currentUser;
+        requestWakeLock();
+        recognition.start();
+    }
 
-    function analyze(cmd) {
-        if (match(cmd, ["終了", "ストップ"])) {
-            isLocked = true; recognition.stop(); updateStatus(false);
-            speak("音声終了。"); return;
-        }
+    // Wake Lock: 画面消灯を阻止
+    async function requestWakeLock() {
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+    }
 
-        // --- 名前の復唱バグ修正箇所 ---
-        if (!state.inspector) {
-            const user = inspectors.find(i => i.a.some(a => cmd.includes(a)));
-            if (user) {
-                state.inspector = user.k; // 内部データに保存
-                document.getElementById('user-display').innerText = "検査員: " + user.k;
-                speak(user.k + "さん、了解しました。"); // user.keyではなくuser.kを使用
-            }
+    recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().replace(/\s/g, "");
+        console.log("聞取:", transcript);
+
+        if (transcript.includes("検査開始")) {
+            isInspectionActive = true;
+            updateMicStatus(true);
+            speak("検査を開始します。項目をどうぞ。");
             return;
         }
 
-        const num = cmd.match(/\d+(\.\d+)?/)?.[0];
+        if (isInspectionActive) {
+            if (transcript.includes("終了")) {
+                isInspectionActive = false;
+                updateMicStatus(false);
+                speak("検査を終了。全てのデータを保存しました。");
+                return;
+            }
+            analyzeInput(transcript);
+        }
+    };
+
+    recognition.onend = () => recognition.start();
+
+    function analyzeInput(cmd) {
+        let num = cmd.match(/\d+(\.\d+)?/)?.[0];
         
-        if (match(cmd, ["ペーハー", "ベーハー", "ph"])) {
-            state.ph = num; updateUI("res-ph", num); speak("ペーハー " + num);
-        } else if (match(cmd, ["do"])) {
-            state.do = num; updateUI("res-do", num); speak("デーオー " + num);
-        } else if (match(cmd, ["透視度"])) {
-            state.toshido = num; updateUI("res-toshido", num); speak("透視 " + num);
-        } else if (match(cmd, ["残留塩素", "ざんりゅう", "えんそ"])) {
-            let clVal = cmd.includes("不検出") ? "不検出" : (cmd.includes("検出") ? "検出" : num);
-            state.cl = clVal; updateUI("res-cl", clVal); speak("塩素 " + clVal);
-        } else if (match(cmd, ["水温", "すいおん"])) {
-            state.temp = num; updateUI("res-temp", num); speak("水温 " + num);
-        } else if (match(cmd, ["指摘"])) {
-            const idxMatch = cmd.match(/([1-7])/);
-            const idx = idxMatch ? idxMatch[1] : "1";
-            const note = cmd.split(/指摘[1-7]?/)[1] || "入力あり";
-            state["note" + idx] = note; renderNotes(); speak("指摘" + idx + "了解");
+        // 透視度の特殊処理
+        if (cmd.includes("30以上")) num = "30以上";
+        // 塩素の特殊処理
+        if (cmd.includes("不検出")) num = "不検出";
+        if (cmd.includes("検出") && !cmd.includes("不")) num = "検出";
+        if (cmd.includes("0.1未満")) num = "0.1未満";
+
+        for (let key in dictionary) {
+            if (dictionary[key].some(w => cmd.includes(w))) {
+                if (key === "memo") {
+                    const text = cmd.split(/メモ|備考|指摘|シテキ/)[1] || "";
+                    saveToGas("メモ", text);
+                    document.getElementById('v-memo').innerHTML += `<div>${text}</div>`;
+                    speak("メモ、了解。");
+                } else if (num) {
+                    saveToGas(key.toUpperCase(), num);
+                    document.getElementById(`v-${key}`).innerText = num;
+                    speak(`${key}、${num}、了解。`);
+                }
+                return;
+            }
         }
     }
 
-    function match(cmd, list) { return list.some(word => cmd.includes(word)); }
-    function kanjiToNum(str) {
-        const kanji = {"ゼロ":0,"一":1,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"点":"."};
-        return str.replace(/[一二三四五六七八九ゼロ点]/g, s => kanji[s]);
-    }
-
-    function renderNotes() {
-        let h = "";
-        for(let i=1; i<=7; i++) if(state["note"+i]) h += `<div>[${i}] ${state["note"+i]}</div>`;
-        document.getElementById('note-display').innerHTML = h || "--";
-    }
-
-    document.getElementById('save-btn').onclick = () => {
-        if (!state.inspector) return;
-        speak("保存します。");
-        fetch(GAS_URL, { method: "POST", body: JSON.stringify(state) })
-        .then(() => { speak("保存しました。"); setTimeout(()=>location.reload(), 1000); });
-    };
-
-    document.getElementById('list-btn').onclick = () => {
-        if (!state.inspector) return;
-        const area = document.getElementById('history-area');
-        const content = document.getElementById('history-content');
-        area.style.display = "block";
-        content.innerHTML = "読込中...";
-        fetch(GAS_URL + "?name=" + encodeURIComponent(state.inspector))
-        .then(res => res.json())
-        .then(data => {
-            if (data.length === 0) { content.innerHTML = "今日のデータはありません"; return; }
-            let html = "<table><tr><th>時刻</th><th>pH</th><th>DO</th><th>Tr</th></tr>";
-            data.forEach(row => {
-                const time = new Date(row[0]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                html += `<tr><td>${time}</td><td>${row[2]}</td><td>${row[3]}</td><td>${row[4]}</td></tr>`;
-            });
-            html += "</table>";
-            content.innerHTML = html;
+    async function saveToGas(item, value) {
+        await fetch(GAS_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "save", inspector: currentUser, item, value })
         });
-    };
-
-    function updateUI(id, val) { document.getElementById(id).innerText = val || "--"; }
-    function updateStatus(listening) {
-        document.getElementById('mic-status').className = listening ? "listening" : "";
-        document.getElementById('status-text').innerText = listening ? "聴取中" : "停止";
     }
-    function addLog(m) {
-        const l = document.getElementById('log');
-        l.innerHTML = "<div>" + m + "</div>" + l.innerHTML;
+
+    async function loadTodayLogs() {
+        const res = await fetch(`${GAS_URL}?action=getLogs&name=${encodeURIComponent(currentUser)}`);
+        const data = await res.json();
+        const table = document.getElementById('history');
+        table.innerHTML = `<tr><th>時刻</th><th>項目</th><th>値</th></tr>` + 
+            data.map(r => `<tr><td>${new Date(r[0]).toLocaleTimeString()}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join('');
+    }
+
+    function speak(txt) {
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(txt);
+        u.lang = 'ja-JP';
+        synth.speak(u);
+    }
+
+    function updateMicStatus(active) {
+        const b = document.getElementById('mic-status');
+        b.innerText = active ? "LISTENING" : "STANDBY";
+        b.className = active ? "status-badge active" : "status-badge";
+    }
+
+    function logout() {
+        localStorage.clear();
+        location.reload();
     }
 </script>
 </body>
