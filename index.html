@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTROY-V14-VOICE-COMPLETE</title>
+    <title>DESTROY-V15-RESURRECTION</title>
     <style>
         :root { --bg: #000; --card: #111; --accent: #00e5ff; --danger: #ff0055; --success: #00ff66; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
@@ -29,7 +29,7 @@
     <h1 style="color:var(--danger)">DESTROY LOGIN</h1>
     <select id="user-select"><option>読み込み中...</option></select>
     <input type="password" id="pin-input" placeholder="PINコード" inputmode="numeric">
-    <button class="btn" style="background:var(--accent); color:#000;" onclick="attemptLogin()">ログイン</button>
+    <button class="btn" style="background:var(--accent); color:#000;" id="auth-btn">ログイン</button>
 </div>
 
 <div id="main-screen" class="hidden">
@@ -48,8 +48,8 @@
         <div class="card" style="grid-column: span 2;"><div class="label">指摘メモ</div><div id="v-memo" style="font-size:0.85em; color:#aaa; min-height:40px;"></div></div>
     </div>
 
-    <button id="save-btn" class="btn" onclick="saveFinalData()">💾 保存 (SAVE)</button>
-    <button class="btn" style="background:var(--card); color:var(--accent); border:1px solid var(--accent);" onclick="loadTodayLogs()">本日の全履歴を確認</button>
+    <button id="save-btn" class="btn">💾 保存 (SAVE)</button>
+    <button class="btn" id="history-btn" style="background:var(--card); color:var(--accent); border:1px solid var(--accent);">本日の全履歴を確認</button>
     
     <div id="history-wrapper"><table id="history"></table></div>
     <button style="background:none; border:none; color:#444; margin-top:20px; width:100%;" onclick="logout()">ログアウト</button>
@@ -65,7 +65,7 @@
     let state = { ph:"", do:"", toshido:"", cl:"", temp:"", odei:"", note1:"", note2:"", note3:"", note4:"", note5:"", note6:"", note7:"", memoCount:1 };
 
     const dictionary = {
-        ph: ["ペーハー", "ベーハー", "ph", "ピーエイチ", "冷え地", "ピエチ"],
+        ph: ["ペーハー", "ベーハー", "ph", "ピーエイチ", "ピエチ"],
         do: ["ディーオー", "デーオー", "デオ", "do", "どお", "どう", "どー"],
         toshido: ["透視", "トウシ", "トウメイド", "tr", "ティーアール", "ミズ", "みず", "投資", "糖度", "当時", "ドウド"],
         cl: ["残留塩素", "塩素", "ざんりゅう", "えんそ", "検出", "不検出", "0.1未満"],
@@ -79,29 +79,42 @@
     const recognition = new SpeechRecognition();
     recognition.lang = 'ja-JP'; recognition.continuous = true;
 
-    window.onload = async () => {
-        try {
-            const res = await fetch(`${GAS_URL}?action=getUsers`);
-            const users = await res.json();
-            document.getElementById('user-select').innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
-            if (currentUser && localStorage.getItem('destroy_date') === new Date().toLocaleDateString()) {
-                showMain();
-            }
-        } catch(e) { console.error("起動エラー:", e); }
-    };
-
+    // 音声読み上げ関数（強化版）
     function speak(t) {
         if (!t) return;
-        synth.cancel();
+        synth.cancel(); // 進行中の音声を即停止
         const u = new SpeechSynthesisUtterance(t);
-        u.lang = 'ja-JP'; u.rate = 1.3;
+        u.lang = 'ja-JP';
+        u.rate = 1.3;
+        u.pitch = 1.0;
+        
+        // 日本語ボイスを確実に選択
+        const voices = synth.getVoices();
+        const jVoice = voices.find(v => v.lang.includes('ja'));
+        if (jVoice) u.voice = jVoice;
+        
         synth.speak(u);
     }
 
-    async function attemptLogin() {
+    window.onload = async () => {
+        const res = await fetch(`${GAS_URL}?action=getUsers`);
+        const users = await res.json();
+        document.getElementById('user-select').innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
+        
+        // オートログイン時も一度画面をタップさせることで音声ロック解除
+        if (currentUser && localStorage.getItem('destroy_date') === new Date().toLocaleDateString()) {
+            showMain();
+        }
+    };
+
+    // ログインボタン（音声ロック解除の最重要ポイント）
+    document.getElementById('auth-btn').onclick = async () => {
         const name = document.getElementById('user-select').value;
         const pin = document.getElementById('pin-input').value;
-        speak("認証中");
+        
+        // ここで「無音」を流して音声ロックを解除
+        speak(" "); 
+
         const res = await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "login", name, pin }) });
         const result = await res.json();
         if (result.success) {
@@ -109,12 +122,11 @@
             localStorage.setItem('destroy_user', name);
             localStorage.setItem('destroy_date', new Date().toLocaleDateString());
             showMain();
-            setTimeout(() => speak(name + "さん、認証しました。検査開始、と言ってください。"), 500);
+            speak(name + "さん、認証しました。検査開始、と言ってください。");
         } else {
-            speak("ピーアイエヌが違います");
-            alert("PINが違います");
+            speak("ピーアイエヌが違います。");
         }
-    }
+    };
 
     function showMain() {
         document.getElementById('login-screen').classList.add('hidden');
@@ -128,23 +140,21 @@
         if (isLocked) return;
         const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().replace(/\s+/g, "");
         
-        // 検査開始のウェイクワード判定
         if (!isInspectionActive) {
             if (transcript.includes("検査開始") || transcript.includes("開始")) {
                 isInspectionActive = true;
                 updateMicStatus(true);
-                speak("システム起動。どうぞ。");
+                speak("検査を開始します。どうぞ。");
             }
             return;
         }
 
-        // 終了の判定
         if (transcript.includes("終了") || transcript.includes("完了") || transcript.includes("送信")) {
             isInspectionActive = false;
             isLocked = true;
             recognition.stop();
             updateMicStatus(false);
-            speak("入力を終了しました。数値を転記してください。");
+            speak("終了しました。転記をお願いします。");
             return;
         }
 
@@ -168,7 +178,7 @@
                         state["note" + state.memoCount] = text;
                         document.getElementById('v-memo').innerHTML += `<div>[${state.memoCount}] ${text}</div>`;
                         state.memoCount++;
-                        speak("メモ了解");
+                        speak("メモ、了解。");
                     }
                 } else if (num) {
                     state[key] = num;
@@ -181,9 +191,9 @@
         }
     }
 
-    async function saveFinalData() {
-        if (!state.ph && !state.do && !state.toshido) { speak("データがありません"); return; }
-        speak("スプレッドシートに保存中。");
+    document.getElementById('save-btn').onclick = async () => {
+        if (!state.ph && !state.do && !state.toshido) return;
+        speak("保存します。");
         const res = await fetch(GAS_URL, {
             method: "POST",
             body: JSON.stringify({ action: "save", inspector: currentUser, data: state })
@@ -193,23 +203,22 @@
             speak("保存完了。リセットします。");
             setTimeout(() => location.reload(), 1000);
         }
-    }
+    };
 
-    async function loadTodayLogs() {
+    document.getElementById('history-btn').onclick = async () => {
         if (!currentUser) return;
-        speak("履歴を読み込みます。");
+        speak("履歴を表示します。");
         const res = await fetch(`${GAS_URL}?action=getLogs&name=${encodeURIComponent(currentUser)}`);
         const data = await res.json();
         const wrapper = document.getElementById('history-wrapper');
         wrapper.style.display = "block";
-        
         let html = `<tr><th>時刻</th><th>pH</th><th>DO</th><th>Tr</th><th>塩素</th><th>温</th><th>SV</th><th>指1</th><th>指2</th><th>指3</th><th>指4</th><th>指5</th><th>指6</th><th>指7</th></tr>`;
         data.forEach(r => {
             const time = new Date(r[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
             html += `<tr><td>${time}</td><td>${r[2]||'-'}</td><td>${r[3]||'-'}</td><td>${r[4]||'-'}</td><td>${r[5]||'-'}</td><td>${r[6]||'-'}</td><td>${r[7]||'-'}</td><td>${r[8]||'-'}</td><td>${r[9]||'-'}</td><td>${r[10]||'-'}</td><td>${r[11]||'-'}</td><td>${r[12]||'-'}</td><td>${r[13]||'-'}</td><td>${r[14]||'-'}</td></tr>`;
         });
         document.getElementById('history').innerHTML = html;
-    }
+    };
 
     function updateMicStatus(a) {
         document.getElementById('mic-status').className = a ? "listening" : "";
@@ -217,6 +226,11 @@
     }
 
     function logout() { localStorage.clear(); location.reload(); }
+
+    function kanjiToNum(str) {
+        const kanji = {"ゼロ":0,"一":1,"二":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"点":"."};
+        return str.replace(/[一二三四五六七八九ゼロ点]/g, s => kanji[s]);
+    }
 </script>
 </body>
 </html>
