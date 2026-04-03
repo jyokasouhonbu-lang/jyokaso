@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTROY-V12-WORKFLOW</title>
+    <title>DESTROY-V13-FINAL</title>
     <style>
         :root { --bg: #000; --card: #111; --accent: #00e5ff; --danger: #ff0055; --success: #00ff66; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
@@ -15,8 +15,13 @@
         .val { font-size: 1.6em; font-weight: bold; color: var(--success); }
         .btn { width: 100%; padding: 20px; border: none; border-radius: 12px; font-weight: bold; margin-top: 10px; cursor: pointer; font-size: 1.1em; }
         #save-btn { background: var(--success); color: #000; border: 4px solid #fff; }
-        #history { width: 100%; font-size: 0.7em; border-collapse: collapse; margin-top: 10px; color: #eee; }
-        #history th { color: var(--accent); border-bottom: 1px solid var(--accent); padding: 5px; }
+        
+        /* 履歴テーブル：全項目表示用 */
+        #history-wrapper { overflow-x: auto; margin-top: 10px; background: #111; border: 1px solid var(--accent); border-radius: 8px; display: none; }
+        #history { width: 1000px; font-size: 0.7em; border-collapse: collapse; }
+        #history th { color: var(--accent); border-bottom: 1px solid var(--accent); padding: 8px; background: #222; position: sticky; left: 0; }
+        #history td { border-bottom: 1px solid #333; padding: 8px; text-align: center; }
+
         .listening { color: var(--danger); animation: blink 0.8s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
     </style>
@@ -32,7 +37,7 @@
 
 <div id="main-screen" class="hidden">
     <div style="display:flex; justify-content:space-between; padding:8px; background:#111; border-radius:8px;">
-        <div><span id="mic-status">●</span> <span id="status-text">待機</span></div>
+        <div><span id="mic-status">●</span> <span id="status-text">待機中</span></div>
         <div id="display-name" style="color:var(--accent); font-weight:bold;">---</div>
     </div>
 
@@ -46,13 +51,12 @@
         <div class="card" style="grid-column: span 2;"><div class="label">指摘メモ</div><div id="v-memo" style="font-size:0.85em; color:#aaa; min-height:40px;"></div></div>
     </div>
 
-    <div id="log" style="font-size:0.65em; color:#555; height:20px; overflow:hidden;"></div>
-
     <button id="save-btn" class="btn" onclick="saveFinalData()">💾 スプレッドシートに保存</button>
-    <button class="btn" style="background:var(--card); color:var(--accent); border:1px solid var(--accent);" onclick="loadTodayLogs()">本日の履歴を確認</button>
+    <button class="btn" style="background:var(--card); color:var(--accent); border:1px solid var(--accent);" onclick="loadTodayLogs()">本日の全履歴を確認</button>
     
-    <div id="history-area"></div>
-    <button style="background:none; border:none; color:#444; margin-top:20px; width:100%;" onclick="logout()">ログアウト / ユーザー切替</button>
+    <div id="history-wrapper"><table id="history"></table></div>
+
+    <button style="background:none; border:none; color:#444; margin-top:20px; width:100%;" onclick="logout()">ログアウト</button>
 </div>
 
 <script>
@@ -60,17 +64,17 @@
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzF9N8WTcDQCMf0Sy43yeHPc3avSyh6i66-tiWSxI1xEkHF0hfw3xXTxfK7YdSFxY72zw/exec";
 
     let currentUser = localStorage.getItem('destroy_user');
-    let isLocked = false; 
+    let isInspectionActive = false; // 検査開始フラグ
+    let isLocked = false; // 保存後のロック
     let state = { ph:"", do:"", toshido:"", cl:"", temp:"", odei:"", note1:"", note2:"", note3:"", note4:"", note5:"", note6:"", note7:"", memoCount:1 };
 
-    // 耳の強化：ありとあらゆる聞き間違いパターンを網羅
     const dictionary = {
-        ph: ["ペーハー", "ベーハー", "ph", "ピーエイチ", "冷え地", "ピエチ"],
+        ph: ["ペーハー", "ベーハー", "ph", "ピーエイチ", "ピエチ"],
         do: ["ディーオー", "デーオー", "デオ", "do", "どお", "どう", "どー"],
-        toshido: ["透視", "トウシ", "トウメイド", "tr", "ティーアール", "ミズ", "みず", "投資", "糖度", "当時", "当事", "等速", "ドウド", "トウド"],
-        cl: ["残留塩素", "塩素", "ざんりゅう", "えんそ", "エンソ"],
-        temp: ["水温", "すいおん", "温度", "オンド"],
-        odei: ["汚泥", "ちんでん", "オデイ", "sv", "エスブイ", "えすぶい"],
+        toshido: ["透視", "トウシ", "トウメイド", "tr", "ティーアール", "ミズ", "みず", "投資", "糖度", "当時", "ドウド"],
+        cl: ["残留塩素", "塩素", "ざんりゅう", "えんそ"],
+        temp: ["水温", "すいおん", "温度"],
+        odei: ["汚泥", "ちんでん", "オデイ", "sv", "エスブイ"],
         memo: ["メモ", "備考", "指摘", "シテキ", "異常", "いじょう", "めも"]
     };
 
@@ -96,7 +100,7 @@
             localStorage.setItem('destroy_user', name);
             localStorage.setItem('destroy_date', new Date().toLocaleDateString());
             showMain();
-        } else { alert("PINコードが違います"); }
+        } else { alert("PINが違います"); }
     }
 
     function showMain() {
@@ -105,7 +109,7 @@
         document.getElementById('display-name').innerText = currentUser;
         try { navigator.wakeLock.request('screen'); } catch(e){}
         recognition.start();
-        updateMicStatus(true);
+        speak("待機モード。検査開始と言ってください。");
     }
 
     function speak(t) { synth.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; synth.speak(u); }
@@ -114,13 +118,26 @@
         if (isLocked) return;
         const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().replace(/\s+/g, "");
         
-        if (transcript.includes("終了") || transcript.includes("完了")) {
-            isLocked = true;
-            recognition.stop();
-            updateMicStatus(false);
-            speak("音声入力を終了しました。数値を転記してください。");
+        // 1. 検査開始の判定
+        if (!isInspectionActive) {
+            if (transcript.includes("検査開始") || transcript.includes("開始")) {
+                isInspectionActive = true;
+                updateMicStatus(true);
+                speak("システム起動。項目をどうぞ。");
+            }
             return;
         }
+
+        // 2. 入力終了の判定
+        if (transcript.includes("終了") || transcript.includes("完了")) {
+            isInspectionActive = false;
+            isLocked = true; // 転記中は入力を受け付けない
+            recognition.stop();
+            updateMicStatus(false);
+            speak("入力を終了しました。転記してください。");
+            return;
+        }
+
         analyzeInput(transcript);
     };
 
@@ -136,7 +153,7 @@
         for (let key in dictionary) {
             if (dictionary[key].some(w => cmd.includes(w))) {
                 if (key === "memo") {
-                    const text = cmd.split(/メモ|備考|指摘|シテキ|異常|いじょう|めも/)[1] || "異常あり";
+                    const text = cmd.split(/メモ|備考|指摘|シテキ|異常|いじょう|めも/)[1] || "入力あり";
                     if(state.memoCount <= 7) {
                         state["note" + state.memoCount] = text;
                         document.getElementById('v-memo').innerHTML += `<div>[${state.memoCount}] ${text}</div>`;
@@ -155,24 +172,37 @@
 
     async function saveFinalData() {
         if (!state.ph && !state.do) { alert("データがありません"); return; }
-        speak("保存中");
+        speak("保存します");
         const res = await fetch(GAS_URL, {
             method: "POST",
             body: JSON.stringify({ action: "save", inspector: currentUser, data: state })
         });
         const result = await res.json();
         if (result.success) {
-            speak("保存しました");
-            setTimeout(() => location.reload(), 1000);
+            speak("完了");
+            setTimeout(() => location.reload(), 800);
         }
     }
 
     async function loadTodayLogs() {
-        const res = await fetch(`${GAS_URL}?action=getLogs&name=${encodeURIComponent(currentUser)}&action=getLogs`);
+        const res = await fetch(`${GAS_URL}?action=getLogs&name=${encodeURIComponent(currentUser)}`);
         const data = await res.json();
-        const area = document.getElementById('history-area');
-        area.innerHTML = `<table id="history"><tr><th>時刻</th><th>pH</th><th>DO</th><th>Tr</th></tr>` + 
-            data.map(r => `<tr><td>${new Date(r[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join('') + `</table>`;
+        const wrapper = document.getElementById('history-wrapper');
+        const table = document.getElementById('history');
+        wrapper.style.display = "block";
+        
+        let html = `<tr><th>時刻</th><th>pH</th><th>DO</th><th>Tr</th><th>塩素</th><th>温</th><th>汚泥</th><th>指1</th><th>指2</th><th>指3</th><th>指4</th><th>指5</th><th>指6</th><th>指7</th></tr>`;
+        
+        data.forEach(r => {
+            const time = new Date(r[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+            html += `<tr>
+                <td>${time}</td><td>${r[2]||'-'}</td><td>${r[3]||'-'}</td><td>${r[4]||'-'}</td>
+                <td>${r[5]||'-'}</td><td>${r[6]||'-'}</td><td>${r[7]||'-'}</td>
+                <td>${r[8]||'-'}</td><td>${r[9]||'-'}</td><td>${r[10]||'-'}</td>
+                <td>${r[11]||'-'}</td><td>${r[12]||'-'}</td><td>${r[13]||'-'}</td><td>${r[14]||'-'}</td>
+            </tr>`;
+        });
+        table.innerHTML = html;
     }
 
     function updateMicStatus(a) {
