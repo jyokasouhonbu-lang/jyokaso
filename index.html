@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESTROY-V13-FINAL</title>
+    <title>DESTROY-V14-VOICE-COMPLETE</title>
     <style>
         :root { --bg: #000; --card: #111; --accent: #00e5ff; --danger: #ff0055; --success: #00ff66; }
         body { font-family: sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 10px; }
@@ -15,13 +15,10 @@
         .val { font-size: 1.6em; font-weight: bold; color: var(--success); }
         .btn { width: 100%; padding: 20px; border: none; border-radius: 12px; font-weight: bold; margin-top: 10px; cursor: pointer; font-size: 1.1em; }
         #save-btn { background: var(--success); color: #000; border: 4px solid #fff; }
-        
-        /* 履歴テーブル：全項目表示用 */
         #history-wrapper { overflow-x: auto; margin-top: 10px; background: #111; border: 1px solid var(--accent); border-radius: 8px; display: none; }
         #history { width: 1000px; font-size: 0.7em; border-collapse: collapse; }
-        #history th { color: var(--accent); border-bottom: 1px solid var(--accent); padding: 8px; background: #222; position: sticky; left: 0; }
+        #history th { color: var(--accent); border-bottom: 1px solid var(--accent); padding: 8px; background: #222; }
         #history td { border-bottom: 1px solid #333; padding: 8px; text-align: center; }
-
         .listening { color: var(--danger); animation: blink 0.8s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
     </style>
@@ -32,7 +29,7 @@
     <h1 style="color:var(--danger)">DESTROY LOGIN</h1>
     <select id="user-select"><option>読み込み中...</option></select>
     <input type="password" id="pin-input" placeholder="PINコード" inputmode="numeric">
-    <button class="btn" style="background:var(--accent)" onclick="attemptLogin()">ログイン</button>
+    <button class="btn" style="background:var(--accent); color:#000;" onclick="attemptLogin()">ログイン</button>
 </div>
 
 <div id="main-screen" class="hidden">
@@ -51,28 +48,27 @@
         <div class="card" style="grid-column: span 2;"><div class="label">指摘メモ</div><div id="v-memo" style="font-size:0.85em; color:#aaa; min-height:40px;"></div></div>
     </div>
 
-    <button id="save-btn" class="btn" onclick="saveFinalData()">💾 スプレッドシートに保存</button>
+    <button id="save-btn" class="btn" onclick="saveFinalData()">💾 保存 (SAVE)</button>
     <button class="btn" style="background:var(--card); color:var(--accent); border:1px solid var(--accent);" onclick="loadTodayLogs()">本日の全履歴を確認</button>
     
     <div id="history-wrapper"><table id="history"></table></div>
-
     <button style="background:none; border:none; color:#444; margin-top:20px; width:100%;" onclick="logout()">ログアウト</button>
 </div>
 
 <script>
-    /** ★ここにGASのウェブアプリURLを貼り付け★ */
+    /** ★ここにGASのURLを貼り付け★ */
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzF9N8WTcDQCMf0Sy43yeHPc3avSyh6i66-tiWSxI1xEkHF0hfw3xXTxfK7YdSFxY72zw/exec";
 
     let currentUser = localStorage.getItem('destroy_user');
-    let isInspectionActive = false; // 検査開始フラグ
-    let isLocked = false; // 保存後のロック
+    let isInspectionActive = false; 
+    let isLocked = false; 
     let state = { ph:"", do:"", toshido:"", cl:"", temp:"", odei:"", note1:"", note2:"", note3:"", note4:"", note5:"", note6:"", note7:"", memoCount:1 };
 
     const dictionary = {
-        ph: ["ペーハー", "ベーハー", "ph", "ピーエイチ", "ピエチ"],
+        ph: ["ペーハー", "ベーハー", "ph", "ピーエイチ", "冷え地", "ピエチ"],
         do: ["ディーオー", "デーオー", "デオ", "do", "どお", "どう", "どー"],
         toshido: ["透視", "トウシ", "トウメイド", "tr", "ティーアール", "ミズ", "みず", "投資", "糖度", "当時", "ドウド"],
-        cl: ["残留塩素", "塩素", "ざんりゅう", "えんそ"],
+        cl: ["残留塩素", "塩素", "ざんりゅう", "えんそ", "検出", "不検出", "0.1未満"],
         temp: ["水温", "すいおん", "温度"],
         odei: ["汚泥", "ちんでん", "オデイ", "sv", "エスブイ"],
         memo: ["メモ", "備考", "指摘", "シテキ", "異常", "いじょう", "めも"]
@@ -84,15 +80,28 @@
     recognition.lang = 'ja-JP'; recognition.continuous = true;
 
     window.onload = async () => {
-        const res = await fetch(`${GAS_URL}?action=getUsers`);
-        const users = await res.json();
-        document.getElementById('user-select').innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
-        if (currentUser && localStorage.getItem('destroy_date') === new Date().toLocaleDateString()) showMain();
+        try {
+            const res = await fetch(`${GAS_URL}?action=getUsers`);
+            const users = await res.json();
+            document.getElementById('user-select').innerHTML = users.map(u => `<option value="${u}">${u}</option>`).join('');
+            if (currentUser && localStorage.getItem('destroy_date') === new Date().toLocaleDateString()) {
+                showMain();
+            }
+        } catch(e) { console.error("起動エラー:", e); }
     };
+
+    function speak(t) {
+        if (!t) return;
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(t);
+        u.lang = 'ja-JP'; u.rate = 1.3;
+        synth.speak(u);
+    }
 
     async function attemptLogin() {
         const name = document.getElementById('user-select').value;
         const pin = document.getElementById('pin-input').value;
+        speak("認証中");
         const res = await fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "login", name, pin }) });
         const result = await res.json();
         if (result.success) {
@@ -100,7 +109,11 @@
             localStorage.setItem('destroy_user', name);
             localStorage.setItem('destroy_date', new Date().toLocaleDateString());
             showMain();
-        } else { alert("PINが違います"); }
+            setTimeout(() => speak(name + "さん、認証しました。検査開始、と言ってください。"), 500);
+        } else {
+            speak("ピーアイエヌが違います");
+            alert("PINが違います");
+        }
     }
 
     function showMain() {
@@ -109,32 +122,29 @@
         document.getElementById('display-name').innerText = currentUser;
         try { navigator.wakeLock.request('screen'); } catch(e){}
         recognition.start();
-        speak("待機モード。検査開始と言ってください。");
     }
-
-    function speak(t) { synth.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ja-JP'; synth.speak(u); }
 
     recognition.onresult = (event) => {
         if (isLocked) return;
         const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().replace(/\s+/g, "");
         
-        // 1. 検査開始の判定
+        // 検査開始のウェイクワード判定
         if (!isInspectionActive) {
             if (transcript.includes("検査開始") || transcript.includes("開始")) {
                 isInspectionActive = true;
                 updateMicStatus(true);
-                speak("システム起動。項目をどうぞ。");
+                speak("システム起動。どうぞ。");
             }
             return;
         }
 
-        // 2. 入力終了の判定
-        if (transcript.includes("終了") || transcript.includes("完了")) {
+        // 終了の判定
+        if (transcript.includes("終了") || transcript.includes("完了") || transcript.includes("送信")) {
             isInspectionActive = false;
-            isLocked = true; // 転記中は入力を受け付けない
+            isLocked = true;
             recognition.stop();
             updateMicStatus(false);
-            speak("入力を終了しました。転記してください。");
+            speak("入力を終了しました。数値を転記してください。");
             return;
         }
 
@@ -163,7 +173,8 @@
                 } else if (num) {
                     state[key] = num;
                     document.getElementById(`v-${key}`).innerText = num;
-                    speak(key + num);
+                    const label = (key === "toshido") ? "透視" : (key === "odei" ? "エスブイ" : key);
+                    speak(label + "、" + num + "、了解。");
                 }
                 return;
             }
@@ -171,43 +182,38 @@
     }
 
     async function saveFinalData() {
-        if (!state.ph && !state.do) { alert("データがありません"); return; }
-        speak("保存します");
+        if (!state.ph && !state.do && !state.toshido) { speak("データがありません"); return; }
+        speak("スプレッドシートに保存中。");
         const res = await fetch(GAS_URL, {
             method: "POST",
             body: JSON.stringify({ action: "save", inspector: currentUser, data: state })
         });
         const result = await res.json();
         if (result.success) {
-            speak("完了");
-            setTimeout(() => location.reload(), 800);
+            speak("保存完了。リセットします。");
+            setTimeout(() => location.reload(), 1000);
         }
     }
 
     async function loadTodayLogs() {
+        if (!currentUser) return;
+        speak("履歴を読み込みます。");
         const res = await fetch(`${GAS_URL}?action=getLogs&name=${encodeURIComponent(currentUser)}`);
         const data = await res.json();
         const wrapper = document.getElementById('history-wrapper');
-        const table = document.getElementById('history');
         wrapper.style.display = "block";
         
-        let html = `<tr><th>時刻</th><th>pH</th><th>DO</th><th>Tr</th><th>塩素</th><th>温</th><th>汚泥</th><th>指1</th><th>指2</th><th>指3</th><th>指4</th><th>指5</th><th>指6</th><th>指7</th></tr>`;
-        
+        let html = `<tr><th>時刻</th><th>pH</th><th>DO</th><th>Tr</th><th>塩素</th><th>温</th><th>SV</th><th>指1</th><th>指2</th><th>指3</th><th>指4</th><th>指5</th><th>指6</th><th>指7</th></tr>`;
         data.forEach(r => {
             const time = new Date(r[0]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-            html += `<tr>
-                <td>${time}</td><td>${r[2]||'-'}</td><td>${r[3]||'-'}</td><td>${r[4]||'-'}</td>
-                <td>${r[5]||'-'}</td><td>${r[6]||'-'}</td><td>${r[7]||'-'}</td>
-                <td>${r[8]||'-'}</td><td>${r[9]||'-'}</td><td>${r[10]||'-'}</td>
-                <td>${r[11]||'-'}</td><td>${r[12]||'-'}</td><td>${r[13]||'-'}</td><td>${r[14]||'-'}</td>
-            </tr>`;
+            html += `<tr><td>${time}</td><td>${r[2]||'-'}</td><td>${r[3]||'-'}</td><td>${r[4]||'-'}</td><td>${r[5]||'-'}</td><td>${r[6]||'-'}</td><td>${r[7]||'-'}</td><td>${r[8]||'-'}</td><td>${r[9]||'-'}</td><td>${r[10]||'-'}</td><td>${r[11]||'-'}</td><td>${r[12]||'-'}</td><td>${r[13]||'-'}</td><td>${r[14]||'-'}</td></tr>`;
         });
-        table.innerHTML = html;
+        document.getElementById('history').innerHTML = html;
     }
 
     function updateMicStatus(a) {
         document.getElementById('mic-status').className = a ? "listening" : "";
-        document.getElementById('status-text').innerText = a ? "聴取中" : "音声停止中";
+        document.getElementById('status-text').innerText = a ? "聴取中" : "待機中（開始待ち）";
     }
 
     function logout() { localStorage.clear(); location.reload(); }
